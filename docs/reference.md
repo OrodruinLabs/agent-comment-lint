@@ -1,7 +1,69 @@
 # agent-comment-lint reference
 
 The full contract: what each rule judges, every mode and exit code, the settings file, and what
-the lexers can and cannot tell apart. The [README](../README.md) covers install and a quick start.
+the lexers can and cannot tell apart. The [README](../README.md) covers the basic setup.
+
+## Contents
+
+- [Setup details](#setup-details): [Claude Code](#claude-code), [GitHub Actions](#github-actions),
+  [pre-commit](#pre-commit)
+- [The rules](#the-rules)
+- [Governance references (C3)](#governance-references-c3)
+- [Scope](#scope)
+- [Running it](#running-it)
+- [Exit codes](#exit-codes)
+- [Per-repository settings](#per-repository-settings)
+- [What the lexers know and do not know](#what-the-lexers-know-and-do-not-know)
+- [Known false positives](#known-false-positives)
+- [The write-time hook](#the-write-time-hook)
+- [Versions](#versions)
+- [Developing](#developing)
+
+## Setup details
+
+### Claude Code
+
+The plugin registers a PreToolUse hook on `Write`, `Edit` and `MultiEdit`. It needs `python3` on `PATH`, or the
+interpreter named by `AGENT_COMMENT_LINT_PYTHON`. A write that adds a finding is blocked, and Claude sees the report.
+Writes that only keep old findings go through.
+
+On Claude Code 2.1.275 or later one line installs it:
+`/plugin install agent-comment-lint --marketplace OrodruinLabs/agent-comment-lint`.
+
+To offer the plugin to everyone who opens a repository, commit this to its `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "agent-comment-lint": { "source": { "source": "github", "repo": "OrodruinLabs/agent-comment-lint" } }
+  },
+  "enabledPlugins": { "agent-comment-lint@agent-comment-lint": true }
+}
+```
+
+Without the plugin, an installed command does the same job. Register this command as the PreToolUse hook. The guard
+turns a missing command into exit 2, because Claude Code lets a write through on any other failure:
+
+```
+command -v agent-comment-lint >/dev/null || { echo "Blocked: agent-comment-lint is not installed" >&2; exit 2; }; agent-comment-lint --hook
+```
+
+Enable either the plugin or the command, not both, or every write is judged twice.
+
+### GitHub Actions
+
+| Input | Meaning |
+| --- | --- |
+| `mode` | `diff` (the default: the lines the pull request changes) or `all`. |
+| `base` | The ref `--diff` compares against. Defaults to the pull request's target branch. |
+| `args` | More flags, such as `--config`. |
+
+Without `fetch-depth: 0` on the checkout the merge base is missing, and the step exits 2.
+
+### pre-commit
+
+The hook works with pre-commit and prek. It judges the whole of each staged file, not only its changed lines. A
+repository with old findings fixes them, or excludes their paths, before it turns the hook on.
 
 ## The rules
 
