@@ -1,0 +1,12 @@
+{
+  "name": "agent-comment-lint",
+  "owner": { "name": "Orodruin Labs" },
+  "description": "agent-comment-lint, a Claude Code plugin that stops AI coding agents from bloating code comments.",
+  "plugins": [
+    {
+      "name": "agent-comment-lint",
+      "source": ".",
+      "description": "Blocks a Write or Edit that would add a bloated comment, and tells Claude why."
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+# The whole of each staged file is judged, so a repository with old findings fixes them or excludes them first.
+- id: agent-comment-lint
+  name: agent-comment-lint
+  entry: agent-comment-lint --files
+  language: python
+  pass_filenames: true
+  files: \.(cs|ts|tsx|mts|cts|js|jsx|mjs|cjs|css|sh|ya?ml|tf|tfvars|hcl|py)$

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-comment-lint"
+dynamic = ["version"]
+description = "Stops AI coding agents from bloating code comments. Zero dependencies."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []
+license = { text = "MIT" }
+authors = [{ name = "Orodruin Labs" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Environment :: Console",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.urls]
+Homepage = "https://github.com/OrodruinLabs/agent-comment-lint"
+
+[project.scripts]
+agent-comment-lint = "agent_comment_lint.cli:main"
+
+[tool.setuptools]
+packages = ["agent_comment_lint", "agent_comment_lint.lexers"]
+
+[tool.setuptools.dynamic]
+version = { attr = "agent_comment_lint.__version__" }
