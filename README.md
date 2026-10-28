@@ -30,7 +30,7 @@ agent-comment-lint: 2 violation(s) in 1 of 57 file(s) scanned.
 
 | Rule | Fails when |
 | :--- | :--- |
-| C1 | A comment has more than one line of prose. Consecutive `//` or `#` lines, a multi-line `/* */` and a Python docstring each count as one comment. One-line tags such as `@param` do not count. |
+| C1 | A comment has more than one line of prose. Consecutive `//` or `#` lines, a multi-line `/* */` and a Python docstring each count as one comment. One-line tags such as `@param` do not count, and neither do rulers like `// ----` or other lines without a letter or digit. |
 | C3 | A comment names a ticket, pull request, decision record, plan or doc path, such as `ADR-9`, `PR 519`, `work item 1234`, `docs/x.md` or `CLAUDE.md`. |
 | C5 | An assertion message built with `+ "..."` spans more than two lines. |
 | C7 | A line that carries a comment is over 120 characters. |
@@ -61,7 +61,7 @@ JSX and TSX are included. Other files are skipped, and so are dependency and bui
 
 ## Setup
 
-Pick where it runs; every channel runs the same check. The snippets pin `v1.0.0`. Keep a pin, so a new release never
+Pick where it runs; every channel runs the same check. The snippets pin `v1.1.0`. Keep a pin, so a new release never
 changes your results without a commit of yours.
 
 ### Claude Code
@@ -85,7 +85,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: OrodruinLabs/agent-comment-lint@v1.0.0
+      - uses: OrodruinLabs/agent-comment-lint@v1.1.0
 ```
 
 Only the lines the pull request changes are checked. Keep `fetch-depth: 0`, or the step cannot see what changed and
@@ -96,7 +96,7 @@ fails. The inputs are in [the reference](docs/reference.md#github-actions).
 ```yaml
 repos:
   - repo: https://github.com/OrodruinLabs/agent-comment-lint
-    rev: v1.0.0
+    rev: v1.1.0
     hooks:
       - id: agent-comment-lint
 ```
@@ -106,8 +106,8 @@ This checks each staged file whole, not only its changed lines, so fix or exclud
 ### Command line
 
 ```
-uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.0.0
-pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.0.0
+uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.1.0
+pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.1.0
 ```
 
 ```

@@ -15,6 +15,8 @@ Finding.__doc__ = "One violation: the clause, the inclusive line span it covers,
 RULE_ORDER = ("C1", "C3", "C5", "C7")
 
 COMPLETE_TAG = re.compile(r"^(?:<(\w{1,64})[^>]{0,200}>.{0,4000}</\1>|<\w{1,64}[^>]{0,200}/>|@\w{1,64}.{0,4000})$")
+# A letter or digit in any script: a comment line without one is decoration, such as a ruler, and not prose.
+HAS_TEXT = re.compile(r"[^\W_]")
 CONCATENATION = re.compile(r'^\s*\+\s*"')
 ASSERTION_CONTEXT = re.compile(r"because\s*:|\.Should\(\)|Assert\.")
 
@@ -80,7 +82,7 @@ def comment_lines(raw_lines, lexed, markers):
 
 
 def prose_runs(raw_lines, lexed, markers):
-    """(start, end, count) for every comment block that holds prose; complete one-line tags never count."""
+    """(start, end, count) for every block that holds prose; complete one-line tags and decoration never count."""
     runs = []
     count = start = end = 0
 
@@ -95,7 +97,7 @@ def prose_runs(raw_lines, lexed, markers):
         if body is None:
             count = close()
             continue
-        if body and not COMPLETE_TAG.match(body):
+        if body and HAS_TEXT.search(body) and not COMPLETE_TAG.match(body):
             if count == 0:
                 start = lineno
             count += 1

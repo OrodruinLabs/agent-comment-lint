@@ -914,6 +914,15 @@ class TestHookMode(Sandbox):
     def test_a_new_file_is_judged_on_every_line(self):
         self.assert_blocked(self.hook(event("Write", "new.ts", content="// one\n// two\n")), "new.ts:1: C1:")
 
+    def test_a_banner_write_goes_through(self):
+        content = "// ---\n// Title\n// ---\nconst a = 1;\n"
+        self.assertEqual(self.hook(event("Write", "new.ts", content=content)), (0, "", ""))
+
+    def test_prose_under_a_banner_blocks(self):
+        content = "// ---\n// Title\n// ---\n// extra\nconst a = 1;\n"
+        self.assert_blocked(self.hook(event("Write", "new.ts", content=content)),
+                            "new.ts:2: C1: 2-line prose block (limit 1)")
+
     def test_a_file_left_unscannable_blocks(self):
         self.write("a.ts", "const a = 1;\n")
         result = self.hook(event("Edit", "a.ts", old_string="const a = 1;", new_string="const a = `x"))
