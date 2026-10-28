@@ -29,7 +29,7 @@ agent-comment-lint: 2 violation(s) in 1 of 57 file(s) scanned.
 ## What it checks
 
 | Rule | Fails when |
-| --- | --- |
+| :--- | :--- |
 | C1 | A comment has more than one line of prose. Consecutive `//` or `#` lines, a multi-line `/* */` and a Python docstring each count as one comment. One-line tags such as `@param` do not count. |
 | C3 | A comment names a ticket, pull request, decision record, plan or doc path, such as `ADR-9`, `PR 519`, `work item 1234`, `docs/x.md` or `CLAUDE.md`. |
 | C5 | An assertion message built with `+ "..."` spans more than two lines. |
@@ -39,17 +39,25 @@ The numbers skip because C2, C4 and C6 need a compiler or human judgment, and th
 
 ## Supported languages
 
-| Language | Extensions | Comments read |
-| --- | --- | --- |
-| C# | `.cs` | `//`, `///`, `/* */` |
-| JavaScript and TypeScript, with JSX | `.js` `.jsx` `.mjs` `.cjs` `.ts` `.tsx` `.mts` `.cts` | `//`, `/* */`, `{/* */}` |
-| CSS | `.css` | `/* */` |
-| Shell | `.sh` | `#` |
-| YAML | `.yml` `.yaml` | `#` |
-| HCL and Terraform | `.tf` `.tfvars` `.hcl` | `#`, `//`, `/* */` |
-| Python | `.py` | `#`, docstrings |
+<div align="center">
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/csharp/csharp-original.svg" width="44" height="44" alt=""><br><b>C#</b><br><sub><code>.cs</code></sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/javascript/javascript-original.svg" width="44" height="44" alt=""><br><b>JavaScript</b><br><sub><code>.js</code> <code>.jsx</code> <code>.mjs</code> <code>.cjs</code></sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/typescript/typescript-original.svg" width="44" height="44" alt=""><br><b>TypeScript</b><br><sub><code>.ts</code> <code>.tsx</code> <code>.mts</code> <code>.cts</code></sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/css3/css3-original.svg" width="44" height="44" alt=""><br><b>CSS</b><br><sub><code>.css</code></sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/gnubash/4EAA25" width="44" height="44" alt=""><br><b>Shell</b><br><sub><code>.sh</code></sub></td>
+    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/yaml/CB171E" width="44" height="44" alt=""><br><b>YAML</b><br><sub><code>.yml</code> <code>.yaml</code></sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/terraform/terraform-original.svg" width="44" height="44" alt=""><br><b>Terraform and HCL</b><br><sub><code>.tf</code> <code>.tfvars</code> <code>.hcl</code></sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/python/python-original.svg" width="44" height="44" alt=""><br><b>Python</b><br><sub><code>.py</code></sub></td>
+  </tr>
+</table>
+</div>
 
-Other files are skipped, and so are dependency and build folders such as `node_modules`, `dist` and `.venv`.
+JSX and TSX are included. Other files are skipped, and so are dependency and build folders such as
+`node_modules`, `dist` and `.venv`. Each language's comment styles are listed in [the reference](docs/reference.md#scope).
 
 ## Setup
 
@@ -109,7 +117,7 @@ agent-comment-lint --files a.ts b.py     # the named files
 ```
 
 | Exit code | Meaning |
-| --- | --- |
+| :--- | :--- |
 | 0 | Clean. |
 | 1 | At least one violation. |
 | 2 | Could not scan. Never treated as a pass. |
@@ -120,7 +128,7 @@ Optional. Add `.agent-comment-lint.json` at the repository root. Settings can on
 are no limits to change and no way to silence one comment inline. Every entry states its reason.
 
 | Setting | What it does |
-| --- | --- |
+| :--- | :--- |
 | `exclude` | Paths that are never checked, such as vendored or generated code. |
 | `governance.packs` | Turns on reference packs, below. |
 | `governance.extra` | Adds your own reference patterns, as regular expressions. |
@@ -142,7 +150,7 @@ one tracker or convention. Packs are off by default because the same shapes mean
 turn on only the ones your team uses.
 
 | Pack | Turn it on if you use | It refuses |
-| --- | --- | --- |
+| :--- | :--- | :--- |
 | `azure-boards` | Azure Boards | `AB#4321`, `ADO #795`, `ADO 795` |
 | `decision-ids` | numbered decisions | `D-7`, `D-12b`, `D7` |
 | `task-ids` | task ids shaped prefix, dash, letter, number | `WEB-T022`, `AUTH-F053` |
