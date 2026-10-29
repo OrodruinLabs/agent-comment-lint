@@ -1,0 +1,15 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/repo/.gemini/tmp/t.json",
+  "cwd": "/repo",
+  "hook_event_name": "BeforeTool",
+  "timestamp": "2026-10-29T12:00:00Z",
+  "tool_name": "replace",
+  "tool_input": {
+    "file_path": "/repo/src/old.py",
+    "old_string": "return 1",
+    "new_string": "return 2",
+    "instruction": "Return 2 instead of 1.",
+    "allow_multiple": false
+  }
+}

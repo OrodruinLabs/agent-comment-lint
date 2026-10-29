@@ -12,3 +12,7 @@ A captured event replaces a documented one. Until then, each line says what the 
 - `windsurf-write.json`: constructed 2026-10-29 as one edit with an empty `old_string`, since the docs show no new-file shape; replace with a capture
 - `windsurf-read.json`: the documented `pre_read_code` event with the common fields added, 2026-10-29; replace with a capture
 - `windsurf-pathless.json`: `windsurf-write.json` with `tool_info.file_path` removed, constructed 2026-10-29; rebuild it from the write capture
+- `gemini-write.json`: documented `BeforeTool` base fields and `write_file` arguments (geminicli.com/docs/hooks/reference, tools reference), CONSTRUCTED 2026-10-29; replace with a capture
+- `gemini-edit.json`: documented `BeforeTool` base fields and `replace` arguments incl. `instruction` and `allow_multiple`, CONSTRUCTED 2026-10-29; replace with a capture
+- `gemini-read.json`: documented `BeforeTool` base fields and `read_file` arguments, CONSTRUCTED 2026-10-29; replace with a capture
+- `gemini-pathless.json`: `gemini-write.json` with `tool_input.file_path` removed, constructed 2026-10-29; rebuild it from the write capture

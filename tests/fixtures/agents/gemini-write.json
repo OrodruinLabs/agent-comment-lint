@@ -1,0 +1,12 @@
+{
+  "session_id": "s1",
+  "transcript_path": "/repo/.gemini/tmp/t.json",
+  "cwd": "/repo",
+  "hook_event_name": "BeforeTool",
+  "timestamp": "2026-10-29T12:00:00Z",
+  "tool_name": "write_file",
+  "tool_input": {
+    "file_path": "/repo/src/new.py",
+    "content": "def made():\n    return 1\n"
+  }
+}

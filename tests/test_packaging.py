@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -535,3 +536,80 @@ class TestWindsurfTemplate(unittest.TestCase):
         done = self.run_hook("const a = 1;\n", guards=())
         self.assertEqual(done.returncode, 2)
         self.assertNotEqual(done.stderr.strip(), b"")
+
+
+GEMINI_POSIX = os.path.join(REPO, "integrations", "gemini", "settings.json")
+GEMINI_WINDOWS = os.path.join(REPO, "integrations", "gemini", "settings.windows.json")
+
+
+class TestGeminiTemplate(unittest.TestCase):
+    """The Gemini templates as `.gemini/settings.json` with the guards beside it, run the way Gemini runs them."""
+
+    def handler(self, name):
+        groups = load("integrations", "gemini", name)["hooks"]
+        self.assertEqual(list(groups), ["BeforeTool"])
+        (group,) = groups["BeforeTool"]
+        for tool in ("write_file", "replace"):
+            self.assertRegex(tool, group["matcher"])
+        for tool in ("read_file", "write_file_x", "run_shell_command"):
+            self.assertNotRegex(tool, group["matcher"])
+        (handler,) = group["hooks"]
+        self.assertEqual((handler["name"], handler["type"]), ("agent-comment-lint", "command"))
+        return handler
+
+    def test_both_commands_run_the_guard_for_gemini_from_the_project_directory(self):
+        self.assertIn("$GEMINI_PROJECT_DIR/.gemini/agent-comment-lint-guard.sh gemini",
+                      self.handler("settings.json")["command"])
+        windows = self.handler("settings.windows.json")["command"]
+        self.assertIn("$GEMINI_PROJECT_DIR", windows)
+        self.assertIn("agent-comment-lint-guard.cmd", windows)
+        self.assertIn("gemini", windows)
+
+    def run_hook(self, windows, new_string, guards=(".sh", ".cmd")):
+        """Gemini rewrites `$GEMINI_PROJECT_DIR` quoted for the shell, then runs `bash -c` or `powershell -Command`."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = os.path.join(os.path.realpath(tmp), "repo with space")
+            os.makedirs(os.path.join(root, ".gemini"))
+            for suffix in guards:
+                shutil.copy(GUARD + suffix, os.path.join(root, ".gemini"))
+            bin_dir = os.path.join(tmp, "bin")
+            os.mkdir(bin_dir)
+            arguments = "%*" if os.name == "nt" else '"$@"'
+            fake_command(bin_dir, '"%s" -m agent_comment_lint %s' % (sys.executable, arguments))
+            env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ["PATH"], PYTHONPATH=REPO)
+            event = fixture("gemini-write")
+            event["cwd"] = root
+            event["tool_input"] = {"file_path": os.path.join(root, "dirty.ts"), "content": new_string}
+            if windows:
+                quoted = "'%s'" % root.replace("'", "''")
+                command = self.handler("settings.windows.json")["command"].replace("$GEMINI_PROJECT_DIR", quoted)
+                command = ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+                           command + "; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }"]
+            else:
+                command = self.handler("settings.json")["command"].replace("$GEMINI_PROJECT_DIR", shlex.quote(root))
+                command = [BASH, "-c", command]
+            return subprocess.run(command, input=json.dumps(event).encode("utf-8"), cwd=root, env=env,
+                                  capture_output=True)
+
+    def forms(self):
+        if BASH:
+            yield False
+        if os.name == "nt":
+            yield True
+
+    def test_a_write_adding_a_two_line_comment_is_blocked(self):
+        for windows in self.forms():
+            done = self.run_hook(windows, "// one\n// two\n")
+            self.assertEqual(done.returncode, 2, done.stderr)
+            self.assertIn(b"dirty.ts:1: C1: 2-line prose block (limit 1)", done.stderr)
+
+    def test_a_clean_write_passes_silently(self):
+        for windows in self.forms():
+            done = self.run_hook(windows, "const a = 1;\n")
+            self.assertEqual((done.returncode, done.stdout, done.stderr), (0, b"", b""))
+
+    def test_a_missing_guard_is_blocked_with_two_and_a_reason(self):
+        for windows in self.forms():
+            done = self.run_hook(windows, "const a = 1;\n", guards=())
+            self.assertEqual(done.returncode, 2)
+            self.assertNotEqual(done.stderr.strip(), b"")

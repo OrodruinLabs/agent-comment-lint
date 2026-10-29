@@ -341,3 +341,65 @@ class TestWindsurfAdapter(AdapterContract, unittest.TestCase):
             event = dict(fixture("windsurf-edit"), tool_info=info)
             with self.subTest(info=info), self.assertRaises(hook.HookInputError):
                 hook.targets(event, "windsurf")
+
+
+class TestGeminiAdapter(AdapterContract, unittest.TestCase):
+    agent, write_fixture, non_write_fixture, pathless_fixture = (
+        "gemini", "gemini-write", "gemini-read", "gemini-pathless")
+
+    def test_the_write_fixture_is_a_write(self):
+        event = fixture("gemini-write")
+        info = event["tool_input"]
+        self.assertEqual(hook.targets(event, "gemini"),
+                         [hook.Target("Write", info["file_path"],
+                                      {"file_path": info["file_path"], "content": info["content"]})])
+
+    def test_the_edit_fixture_is_an_edit_that_must_apply_and_ignores_the_instruction(self):
+        event = fixture("gemini-edit")
+        info = event["tool_input"]
+        expected = {"file_path": info["file_path"], "old_string": info["old_string"],
+                    "new_string": info["new_string"], "replace_all": False}
+        self.assertEqual(hook.targets(event, "gemini"),
+                         [hook.Target("Edit", info["file_path"], expected, must_apply=True)])
+
+    def test_allow_multiple_becomes_replace_all_and_defaults_to_false(self):
+        event = fixture("gemini-edit")
+        event["tool_input"]["allow_multiple"] = True
+        self.assertTrue(hook.targets(event, "gemini")[0].tool_input["replace_all"])
+        del event["tool_input"]["allow_multiple"]
+        self.assertFalse(hook.targets(event, "gemini")[0].tool_input["replace_all"])
+
+    def test_a_non_boolean_allow_multiple_is_refused(self):
+        event = fixture("gemini-edit")
+        event["tool_input"]["allow_multiple"] = "yes"
+        with self.assertRaises(hook.HookInputError):
+            hook.targets(event, "gemini")
+
+    def test_a_relative_path_resolves_against_the_events_cwd(self):
+        for name in ("gemini-write", "gemini-edit"):
+            event = fixture(name)
+            event["tool_input"]["file_path"] = "src/a.py"
+            (found,) = hook.targets(event, "gemini")
+            self.assertEqual((found.path, found.tool_input["file_path"]), (at_repo("src/a.py"),) * 2)
+
+    def test_another_event_is_not_judged_and_a_missing_one_is_refused(self):
+        self.assertEqual(hook.targets(dict(fixture("gemini-edit"), hook_event_name="AfterTool"), "gemini"), [])
+        for name in (None, 3):
+            with self.subTest(name=name), self.assertRaises(hook.HookInputError):
+                hook.targets(dict(fixture("gemini-edit"), hook_event_name=name), "gemini")
+        event = fixture("gemini-edit")
+        del event["hook_event_name"]
+        with self.assertRaises(hook.HookInputError):
+            hook.targets(event, "gemini")
+
+    def test_a_missing_tool_name_is_refused(self):
+        with self.assertRaises(hook.HookInputError):
+            hook.targets(dict(fixture("gemini-edit"), tool_name=None), "gemini")
+
+    def test_a_bad_path_is_refused_for_both_tools(self):
+        for name in ("gemini-write", "gemini-edit"):
+            for path in ("", 3, None):
+                event = fixture(name)
+                event["tool_input"]["file_path"] = path
+                with self.subTest(name=name, path=path), self.assertRaises(hook.HookInputError):
+                    hook.targets(event, "gemini")

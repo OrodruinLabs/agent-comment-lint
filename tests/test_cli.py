@@ -1886,3 +1886,33 @@ class TestHookWindsurf(Sandbox):
         code, _out, err = self.run_windsurf("a.ts", "// one\n", old_string="const z = 9;")
         self.assertEqual(code, 2)
         self.assertIn("a.ts: could not scan: " + cli.PATCH_NOT_APPLIED, err)
+
+
+class TestHookGemini(Sandbox):
+    """`--hook --agent gemini` on a BeforeTool event, whose replace must apply exactly."""
+
+    def run_gemini(self, name, **tool_input):
+        event = fixture("gemini-write" if "content" in tool_input else "gemini-edit")
+        event["tool_input"] = dict(tool_input, file_path=os.path.join(self.tmp, name))
+        return self.run_cli("--hook", "--agent", "gemini", stdin=json.dumps(event))
+
+    def test_a_new_file_with_a_two_line_comment_is_blocked(self):
+        code, out, err = self.run_gemini("a.ts", content="// one\n// two\n")
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("a.ts:1: C1: 2-line prose block (limit 1)", err)
+
+    def test_a_clean_new_file_passes_silently(self):
+        self.assertEqual(self.run_gemini("a.ts", content="const a = 1;\n"), (0, "", ""))
+
+    def test_a_replace_whose_old_string_is_not_in_the_file_is_blocked(self):
+        self.write("a.ts", "const a = 1;\n")
+        code, _out, err = self.run_gemini("a.ts", old_string="const z = 9;", new_string="// one\n")
+        self.assertEqual(code, 2)
+        self.assertIn("a.ts: could not scan: " + cli.PATCH_NOT_APPLIED, err)
+
+    def test_a_replace_of_every_occurrence_adding_a_two_line_comment_is_blocked(self):
+        self.write("a.ts", "const a = 1;\nconst b = 2;\nconst c = 1;\n")
+        code, _out, err = self.run_gemini("a.ts", old_string="= 1;", new_string="= 1;\n// one\n// two",
+                                          allow_multiple=True)
+        self.assertEqual(code, 2)
+        self.assertIn("C1: 2-line prose block (limit 1)", err)

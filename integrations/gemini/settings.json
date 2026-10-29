@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "BeforeTool": [
+      {
+        "matcher": "^(write_file|replace)$",
+        "hooks": [
+          {
+            "name": "agent-comment-lint",
+            "type": "command",
+            "command": "sh $GEMINI_PROJECT_DIR/.gemini/agent-comment-lint-guard.sh gemini || exit 2"
+          }
+        ]
+      }
+    ]
+  }
+}

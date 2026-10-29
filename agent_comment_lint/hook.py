@@ -102,8 +102,33 @@ def _windsurf(event):
     return [Target("MultiEdit", path, {"file_path": path, "edits": edits}, must_apply=True)]
 
 
-ADAPTERS = {"claude": _claude, "codex": _codex, "windsurf": _windsurf}
-TITLES = {"claude": "Claude Code", "codex": "Codex", "windsurf": "Windsurf"}
+def _gemini(event):
+    """Gemini CLI's BeforeTool for write_file and replace; a replace must apply exactly, as Gemini may fix its match."""
+    name = event.get("hook_event_name")
+    if not isinstance(name, str):
+        raise HookInputError("no \"hook_event_name\"")
+    tool = event.get("tool_name")
+    if not isinstance(tool, str):
+        raise HookInputError("no \"tool_name\"")
+    if name != "BeforeTool" or tool not in ("write_file", "replace"):
+        return []
+    info = event.get("tool_input")
+    path = info.get("file_path") if isinstance(info, dict) else None
+    if not isinstance(path, str) or not path:
+        raise HookInputError("%s with no \"tool_input.file_path\"" % tool)
+    path = _codex_path(event.get("cwd"), path)
+    if tool == "write_file":
+        return [Target("Write", path, {"file_path": path, "content": info.get("content")})]
+    replace_all = info.get("allow_multiple", False)
+    if not isinstance(replace_all, bool):
+        raise HookInputError("\"allow_multiple\" is not a boolean")
+    edit = {"file_path": path, "old_string": info.get("old_string"), "new_string": info.get("new_string"),
+            "replace_all": replace_all}
+    return [Target("Edit", path, edit, must_apply=True)]
+
+
+ADAPTERS = {"claude": _claude, "codex": _codex, "windsurf": _windsurf, "gemini": _gemini}
+TITLES = {"claude": "Claude Code", "codex": "Codex", "windsurf": "Windsurf", "gemini": "Gemini CLI"}
 
 
 def targets(event, agent):
