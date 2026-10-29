@@ -396,8 +396,8 @@ The same rules judge the same changed lines, and a rejected write exits 2 with t
 These agents get no end-of-session check, so a file they write through their shell is never judged.
 
 Each adapter is built from the agent's documentation and has not been verified live: no agent has been seen blocking
-a write. Treat each as "not yet verified". Copilot, Cursor, Kiro and Antigravity have no adapter, because their
-write payloads, or for Antigravity its block channel, are undocumented. An owner capture is needed first.
+a write. The README marks these "Preview". Copilot, Cursor, Kiro and Antigravity, marked "Planned", have no
+adapter yet; [Agents without an adapter yet](#agents-without-an-adapter-yet) says why.
 
 These hooks are a guardrail against careless comments, not a security boundary against an agent that sets out to
 switch them off: the guards and hook configs sit in folders the agent can write to, and Codex's `commandWindows` runs
@@ -510,6 +510,22 @@ blocked when a line before it matches it once the whitespace at its end is ignor
     `~/.gemini/settings.json`: the check is then set up per machine. That user-level hook blocks every write in a
     project without the guards.
   - Windows uses `settings.windows.json`, which has not been run on Windows.
+
+### Agents without an adapter yet
+
+An adapter needs to know which field of the hook event holds the file path and which holds the new text. For these
+agents the docs do not say, so an adapter written today would rest on guesses. Each waits for one captured event.
+
+- GitHub Copilot: the argument names of its `create` and `edit` tools are undocumented.
+- Cursor: the input of its `Write` tool is undocumented.
+- Kiro: the argument names of the V3 write tools are undocumented. The 2.x shape is known only from the source of its
+  predecessor, the Amazon Q Developer CLI.
+- Antigravity: the write tools' arguments are documented, but its exit codes are not, so how a hook blocks a write is
+  unknown.
+
+To contribute a capture, set `AGENT_COMMENT_LINT_CAPTURE` to a file, register
+`integrations/capture/capture-event.sh` (`capture-event.cmd` on Windows) as the agent's before-write hook, and ask the
+agent to create, edit and read a file. The script appends each event to that file and never blocks.
 
 ## Versions
 
