@@ -11,7 +11,7 @@ import unittest
 
 from unittest import mock
 
-from agent_comment_lint import __version__, cli, gitio, report, session
+from agent_comment_lint import __version__, cli, gitio, hook, report, session
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TWO_BLOCKS = "// one\n// two\nint x;\n// three\n// four\n"
@@ -1188,6 +1188,75 @@ class TestHookMode(Sandbox):
         subprocess.run(("git", "init", "-q"), cwd=other, capture_output=True, check=True)
         self.assertEqual(self.hook(event("Write", os.path.join(other, "a.ts"), content="// one\n// two\n")),
                          (0, "", ""))
+
+
+class TestHookAgents(Sandbox):
+    """The per-target loop, through a test-only agent whose event lists targets as [tool, path, input, must_apply]."""
+
+    PROSE = "// one\n// two\nconst a = 1;\n"
+
+    def run_fake(self, *targets, cwd=None):
+        stdin = json.dumps({"targets": [list(target) for target in targets]})
+        adapters = {"fake": lambda found: [hook.Target(*target) for target in found["targets"]]}
+        with mock.patch.dict(hook.ADAPTERS, adapters), mock.patch.dict(hook.TITLES, {"fake": "Fake"}):
+            return self.run_cli("--hook", "--agent", "fake", stdin=stdin, cwd=cwd)
+
+    def write_target(self, path, content=None):
+        return ("Write", path, {"file_path": path, "content": content or self.PROSE}, False)
+
+    def edit_target(self, path, must_apply):
+        return ("Edit", path, {"file_path": path, "old_string": "absent", "new_string": "x"}, must_apply)
+
+    def test_every_target_is_judged_and_reported(self):
+        code, out, err = self.run_fake(self.write_target("a.ts"), self.write_target("b.ts"))
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("a.ts:1: C1:", err)
+        self.assertIn("b.ts:1: C1:", err)
+
+    def test_a_target_out_of_scope_is_not_judged(self):
+        code, _out, err = self.run_fake(self.write_target("a.ts"), self.write_target("notes.txt"))
+        self.assertEqual(code, 2)
+        self.assertIn("a.ts:1: C1:", err)
+        self.assertNotIn("notes.txt", err)
+
+    def test_an_edit_that_must_apply_and_does_not_is_an_error(self):
+        self.write("a.ts", "const a = 1;\n")
+        code, _out, err = self.run_fake(self.edit_target("a.ts", True))
+        self.assertEqual(code, 2)
+        self.assertIn(cli.PATCH_NOT_APPLIED, err)
+
+    def test_an_edit_that_need_not_apply_is_let_through(self):
+        self.write("a.ts", "const a = 1;\n")
+        self.assertEqual(self.run_fake(self.edit_target("a.ts", False)), (0, "", ""))
+
+    def test_a_sibling_worktree_does_not_leak_into_the_next_target(self):
+        self.init_repo()
+        self.write("a.ts", "const a = 1;\n")
+        self.commit("start")
+        worktree = os.path.realpath(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, worktree, ignore_errors=True)
+        os.rmdir(worktree)
+        self.git("worktree", "add", "-q", worktree, "-b", "task")
+        with open(os.path.join(worktree, ".agent-comment-lint.json"), "w", encoding="utf-8") as handle:
+            handle.write('{"exclude": [{"path": "gen/", "reason": "generated"}]}')
+        subprocess.run(["git", "add", "-A"], cwd=worktree, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "exclude gen"], cwd=worktree, check=True)
+        code, _out, err = self.run_fake(self.write_target(os.path.join(worktree, "gen", "b.ts")),
+                                        self.write_target(os.path.join(self.tmp, "gen", "b.ts")))
+        self.assertEqual(code, 2)
+        self.assertIn("gen/b.ts:1: C1:", err)
+
+    def test_the_write_retry_line_is_for_claude_only(self):
+        _code, _out, err = self.run_fake(self.write_target("a.ts"))
+        self.assertNotIn(report.WRITE_RETRY, err)
+        _code, _out, err = self.run_cli("--hook", stdin=event("Write", "a.ts", content=self.PROSE))
+        self.assertIn(report.WRITE_RETRY, err)
+
+    def test_claude_by_name_is_the_default(self):
+        for content in (self.PROSE, "const a = 1;\n"):
+            stdin = event("Write", "a.ts", content=content)
+            self.assertEqual(self.run_cli("--hook", "--agent", "claude", stdin=stdin),
+                             self.run_cli("--hook", stdin=stdin))
 
 
 class TestRunTexts(unittest.TestCase):

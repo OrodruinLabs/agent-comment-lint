@@ -305,19 +305,25 @@ def save_stdin_body(path):
 
 @unittest.skipUnless(SHELL, "no POSIX shell on PATH")
 class TestGuards(unittest.TestCase):
-    def run_guard(self, body, stdin=b"", agent="claude"):
+    def run_guard(self, body, stdin=b"", agent="claude", in_cwd=False):
         with tempfile.TemporaryDirectory() as tmp:
             bin_dir = os.path.join(tmp, "bin")
             os.mkdir(bin_dir)
-            if body is not None:
+            if body is not None and not in_cwd:
                 fake_command(bin_dir, body.replace("{tmp}", tmp))
-            # With no fake, a POSIX PATH holds only the shell's own directory, so no installed command is reached.
-            path = os.environ["PATH"] if body is not None or os.name == "nt" else os.path.dirname(SHELL)
-            env = dict(os.environ, PATH=bin_dir + os.pathsep + path)
-            done = subprocess.run(script_command(GUARD) + [agent], input=stdin, capture_output=True, env=env)
+            if in_cwd:
+                work = os.path.join(tmp, "work")
+                os.mkdir(work)
+                fake_command(work, body)
+            # The test PATH drops every directory that holds a real install, so a missing command stays missing.
+            kept = [entry for entry in os.environ["PATH"].split(os.pathsep)
+                    if entry and not shutil.which("agent-comment-lint", path=entry)]
+            env = dict(os.environ, PATH=os.pathsep.join([bin_dir] + kept))
+            done = subprocess.run(script_command(GUARD) + [agent], input=stdin, capture_output=True, env=env,
+                                  cwd=os.path.join(tmp, "work") if in_cwd else None)
             done.saved = {}
             for name in os.listdir(tmp):
-                if name != "bin":
+                if name not in ("bin", "work"):
                     with open(os.path.join(tmp, name), "rb") as handle:
                         done.saved[name] = handle.read().replace(b"\r\n", b"\n")
             return done
@@ -343,6 +349,16 @@ class TestGuards(unittest.TestCase):
     def test_a_violation_verdict_is_blocked_with_two(self):
         self.assertEqual(self.run_guard(exit_body(1)).returncode, 2)
 
+    @unittest.skipUnless(os.name == "nt", "a negative exit code is a Windows crash code")
+    def test_a_negative_exit_code_is_blocked_with_two(self):
+        self.assertEqual(self.run_guard("exit /b -1").returncode, 2)
+
+    @unittest.skipUnless(os.name == "nt", "only cmd looks in the working directory before PATH")
+    def test_a_command_in_the_working_directory_is_not_run(self):
+        done = self.run_guard(exit_body(0), in_cwd=True)
+        self.assertEqual(done.returncode, 2)
+        self.assertIn(NOT_INSTALLED, done.stderr)
+
     def test_a_could_not_scan_verdict_stays_two(self):
         self.assertEqual(self.run_guard(exit_body(2)).returncode, 2)
 
@@ -365,13 +381,20 @@ class TestCapture(unittest.TestCase):
             env["AGENT_COMMENT_LINT_CAPTURE"] = capture
         return subprocess.run(script_command(CAPTURE), input=stdin, capture_output=True, env=env)
 
-    def test_stdin_and_a_newline_are_appended(self):
+    def captured(self, events):
         with tempfile.TemporaryDirectory() as tmp:
             target = os.path.join(tmp, "events.jsonl")
-            for event in (b'{"a": 1}', b'{"b": 2}'):
+            for event in events:
                 self.assertEqual(self.run_capture(event, target).returncode, 0)
             with open(target, "rb") as handle:
-                self.assertEqual(handle.read().splitlines(), [b'{"a": 1}', b'{"b": 2}'])
+                return handle.read()
+
+    def test_stdin_and_a_newline_are_appended(self):
+        self.assertEqual(self.captured([b'{"a": 1}', b'{"b": 2}']), b'{"a": 1}\n{"b": 2}\n')
+
+    def test_a_long_single_line_is_copied_byte_for_byte(self):
+        event = b'{"content": "' + b"x" * 100000 + b'"}'
+        self.assertEqual(self.captured([event]), event + b"\n")
 
     def test_an_unset_file_says_so_and_appends_nothing(self):
         for capture in (None, ""):
