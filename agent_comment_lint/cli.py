@@ -372,7 +372,8 @@ def _run_session_end(run, root, load_config, event):
         # Where git cannot name the sessions directory, the session start could not record a snapshot either.
         return
     before = None if located is None else session.recorded(*located)
-    if before is None:
+    # A snapshot tree `git gc` pruned is gone for good, as if none had been taken.
+    if before is None or not gitio.has_object(root, before):
         return
     config = load_config(root)
     run.governance = config.governance

@@ -151,6 +151,16 @@ class TestRepository(unittest.TestCase):
             with self.assertRaises(gitio.GitError):
                 gitio.snapshot_tree(self.tmp, ["a.ts"])
 
+    def test_has_object_is_false_only_for_an_object_the_repository_lacks(self):
+        self.write("a.ts", b"one\n")
+        self.assertTrue(gitio.has_object(self.tmp, gitio.snapshot_tree(self.tmp, ["a.ts"])))
+        self.assertFalse(gitio.has_object(self.tmp, "0" * 39 + "1"))
+        outside = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
+        with mock.patch.dict(os.environ, {"GIT_CEILING_DIRECTORIES": os.path.dirname(outside)}):
+            with self.assertRaises(gitio.GitError):
+                gitio.has_object(outside, "0" * 39 + "1")
+
     def test_has_head_raises_outside_any_repository(self):
         outside = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, outside, ignore_errors=True)

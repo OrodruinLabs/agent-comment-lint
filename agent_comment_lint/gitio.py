@@ -221,6 +221,17 @@ def has_head(root):
     return True
 
 
+def has_object(root, oid):
+    """True when the repository holds the object `oid`; exit 1 is the only answer that means it does not."""
+    try:
+        _git(root, "cat-file", "-e", oid)
+    except GitError as error:
+        if error.returncode == 1:
+            return False
+        raise
+    return True
+
+
 def committed_blob(root, path):
     """The bytes of `path` at HEAD, or None when HEAD lacks it."""
     if not _git(root, "ls-tree", "-z", "HEAD", "--", path):

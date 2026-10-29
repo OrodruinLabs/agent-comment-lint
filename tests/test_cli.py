@@ -1371,6 +1371,13 @@ class TestSessionHooks(Sandbox):
         self.assertEqual(self.stop(), (0, "", ""))
         self.assertFalse(os.path.exists(planted))
 
+    def test_a_snapshot_whose_tree_is_gone_means_no_snapshot(self):
+        self.start()
+        with open(os.path.join(gitio.git_path(self.tmp, session.SESSIONS), "s1"), "w", encoding="ascii") as handle:
+            handle.write("0" * 39 + "1")
+        self.write("b.ts", "// one\n// two\n")
+        self.assertEqual(self.stop(), (0, "", ""))
+
     def test_a_subdirectory_root_reads_its_own_files(self):
         self.write("sub/a.ts", "const a = 1;\n")
         self.commit("sub")
