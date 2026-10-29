@@ -143,3 +143,26 @@ class TestDefine(unittest.TestCase):
 
     def test_define_in_a_recipe_opens_nothing(self):
         self.assertEqual(found("Makefile", "all:\n\tdefine X\n"), [])
+
+
+class TestAssignmentsAndLineEndings(unittest.TestCase):
+    def test_an_assignment_to_a_variable_named_define_opens_no_block(self):
+        for head in ("define = 1", "define := 1", "define ?= x", "define += x", "define != x", "override define = 1"):
+            self.assertEqual(found("Makefile", head + "\n"), [], head)
+
+    def test_a_define_named_with_an_assignment_operator_is_still_a_block(self):
+        self.assertEqual(found("Makefile", "define NAME =\n# ADR-9\nendef\n"), [])
+
+    def test_a_hash_right_after_a_reference_in_a_recipe_is_not_a_comment(self):
+        self.assertEqual(found("Makefile", "all:\n\tcurl $(URL)#docs/frag\n"), [])
+
+    def test_a_hash_after_a_reference_and_a_space_in_a_recipe_is_a_comment(self):
+        self.assertEqual(found("Makefile", "all:\n\techo $(X) # see ADR-9\n"), [("C3", 2)])
+
+    def test_crlf_line_endings_read_like_lf(self):
+        self.assertEqual(found("Makefile", "x = a # see ADR-9\r\n"), [("C3", 1)])
+        self.assertEqual(found("Makefile", 'all:\r\n\techo "# ADR-9"\r\n\techo a # see ADR-9\r\n'), [("C3", 3)])
+        self.assertEqual(found("Makefile", "define X\r\n# ADR-9\r\nendef # see ADR-9\r\n"), [("C3", 3)])
+
+    def test_an_exported_assignment_with_a_trailing_comment_is_read(self):
+        self.assertEqual(found("Makefile", "export X = 1 # see ADR-9\n"), [("C3", 1)])

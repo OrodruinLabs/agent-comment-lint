@@ -4,7 +4,7 @@ import re
 from .base import CODE, COMMENT, STRING, Family, LexError, Line
 from .hashlike import HASH_ONLY
 
-DEFINE = re.compile(r"\s*(?:(?:override|export|private)\s+)*define(?:\s|$)")
+DEFINE = re.compile(r"\s*(?:(?:override|export|private)\s+)*define(?:\s+(?![:?+!]*=)|$)")
 ENDEF = re.compile(r"\s*endef(?=\s|#|$)")
 CLOSERS = {"(": ")", "{": "}"}
 # A shell `#` starts a comment only where a word could start.
@@ -144,7 +144,7 @@ def _scan_recipe(group, text):
         elif ch == "$" and text[i + 1:i + 2] in CLOSERS:
             end = _reference_end(text, i, group.lineno)
             group.span(CODE, text[i:end], CODE)
-            prev = ")"
+            prev = "$"
             i = end
         elif ch in "'\"":
             end = _quote_end(text, i)
