@@ -1245,7 +1245,7 @@ class TestHookAgents(Sandbox):
         code, _out, err = self.run_fake(self.write_target(os.path.join(worktree, "gen", "b.ts")),
                                         self.write_target(os.path.join(self.tmp, "gen", "b.ts")))
         self.assertEqual(code, 2)
-        self.assertIn("gen/b.ts:1: C1:", err)
+        self.assertEqual(err.count("gen/b.ts:1: C1:"), 1)
 
     def test_the_write_retry_line_is_for_claude_only(self):
         _code, _out, err = self.run_fake(self.write_target("a.ts"))
@@ -1375,6 +1375,12 @@ class TestHookCodex(Sandbox):
         code, _out, err = self.run_codex("*** Add File: a.ts", "+// one", "+// two", cwd=os.path.join(self.tmp, "sub"))
         self.assertEqual(code, 2)
         self.assertIn("sub/a.ts:1: C1:", err)
+
+    def test_the_settings_are_read_once_for_a_patch_of_two_files(self):
+        with mock.patch.object(cli, "_load_hook_config", wraps=cli._load_hook_config) as load:
+            code, _out, _err = self.run_codex("*** Add File: a.ts", "+const a = 1;", "*** Add File: b.ts",
+                                              "+const b = 1;")
+        self.assertEqual((code, load.call_count), (0, 1))
 
     def test_a_claude_session_event_is_not_a_codex_event(self):
         for name in ("SessionStart", "Stop"):

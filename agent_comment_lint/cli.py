@@ -419,8 +419,16 @@ def _run_hook(run, root, cwd, load_config, stdin, follow_worktrees, agent="claud
     if name == "Stop":
         _run_session_end(run, root, load_config, event)
         return
+    # Reading the settings takes git calls, so the writes under one root share one reading.
+    loaded = {}
+
+    def config_for(judged_root):
+        if judged_root not in loaded:
+            loaded[judged_root] = load_config(judged_root)
+        return loaded[judged_root]
+
     for target in targets:
-        _judge_target(run, root, cwd, load_config, follow_worktrees, target, title)
+        _judge_target(run, root, cwd, config_for, follow_worktrees, target, title)
 
 
 def _judge_target(run, root, cwd, load_config, follow_worktrees, target, title):
