@@ -394,10 +394,9 @@ def _run_hook(run, root, cwd, load_config, stdin, follow_worktrees):
     """Judge the whole file a proposed write would leave, on the lines the write adds or changes."""
     try:
         event = json.loads(_stdin_text(stdin, errors="strict"))
-        name = event.get("hook_event_name", "PreToolUse") if isinstance(event, dict) else "PreToolUse"
-        if not isinstance(name, str):
-            raise hook.HookInputError("\"hook_event_name\" is not a string")
-        target = hook.target(event) if name == "PreToolUse" else None
+        name = event.get("hook_event_name") if isinstance(event, dict) else None
+        # Any other event is read as a write, so a hook registered by hand on another tool event still judges it.
+        target = None if name in ("SessionStart", "Stop") else hook.target(event)
     except (ValueError, hook.HookInputError) as error:
         raise _Refused("--hook", HOOK_INPUT % error)
     if name == "SessionStart":

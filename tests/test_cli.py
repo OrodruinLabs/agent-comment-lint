@@ -1427,10 +1427,13 @@ class TestSessionHooks(Sandbox):
         self.assertEqual(code, 2)
         self.assertIn("a.ts:1: C1", err)
 
-    def test_an_unknown_event_is_let_through(self):
-        self.assertEqual(self.hook(session_event("Notification")), (0, "", ""))
+    def test_any_other_event_is_judged_as_a_write_as_before(self):
+        code, out, err = self.hook(session_event("PostToolUse", tool_name="Write",
+                                                 tool_input={"file_path": "b.ts", "content": "// one\n// two\n"}))
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("b.ts:1: C1: 2-line prose block (limit 1)", err)
 
-    def test_an_event_that_is_not_an_object_or_has_no_string_name_is_refused(self):
+    def test_an_event_that_is_not_an_object_or_names_no_tool_is_refused(self):
         self.assertEqual(self.hook("[]")[0], 2)
         self.assertEqual(self.hook(json.dumps({"hook_event_name": 3}))[0], 2)
 
