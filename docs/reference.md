@@ -341,10 +341,11 @@ governance list are the policy. There is no inline suppression.
   quote that never closes are exit code 2. It does not read `.RECIPEPREFIX` or the recipe after `;`.
 - Go is lexed across lines. Strings, runes and backtick raw strings (no escapes, across lines) are content, so a `//`
   inside them opens no comment. A directive comment is not prose: what go/ast treats as one (`//go:build`,
-  `//go:embed`, `//nolint:x`, any `//word:word` with no space after the slashes), and also `//line`, `//export`,
-  `//extern` and `// +build`. A reason after a directive is judged as a trailing comment when it follows a ` //`, as in
-  `//nolint:gosec // reason`. A `//lint:ignore Check reason` has no second `//`, so its reason is never read. A
-  `//go:generate` argument that holds ` //` has the rest of its line judged. A struct tag is a string, so a comment
+  `//go:embed`, `//nolint:x`, any `//word:word` with no space after the slashes), a bare `//nolint`, and also
+  `//line`, `//export`, `//extern` and `// +build`. `// nolint`, with a space, is prose. A reason after a directive is
+  judged as a trailing comment. It starts at the first `//` that follows a space or a tab outside a quoted argument
+  (`"..."` or a backtick string), as in `//nolint:gosec // reason`, so `//go:generate sh -c "echo // x"` has none. A
+  `//lint:ignore Check reason` has no second `//`, so its reason is never read. A struct tag is a string, so a comment
   after it is read.
 - Java is lexed across lines. Strings, characters and text blocks (`"""`) are content, an annotation is code, and
   Javadoc follows C1 as JSDoc does. A `\uXXXX` escape is not translated before lexing: see Known false positives.
@@ -375,7 +376,7 @@ accident.
 | Ruby | A `<<` with a word right after it is taken as a heredoc opener after a space, a unary sign or one of `( , = [ { ! & \| ;`, also for an append, and an unterminated one is exit code 2. After a word and a binary sign it is not, so that heredoc's payload is judged. | `puts x if a <<b` and `x =~ /[<<a]/` are exit code 2, and `x = a+<<EOS` leaves its payload judged |
 | C# | Lines inside a multi-line verbatim string `@"..."` are judged as code. | `// ...` lines inside one are a C1 block |
 | Go | The cgo preamble, the comment right before `import "C"`, holds C code, and its lines count as comment prose. | `// #include <stdlib.h>` / `// static int twice(int x) { return 2 * x; }` / `import "C"` is C1 |
-| Go | A `//lint:ignore Check reason` directive has no second `//`, so its reason is never judged. A `//go:generate` argument that holds ` //` has the rest of its line judged. | `//lint:ignore SA1019 see ADR-9` is clean, and `//go:generate sh -c "echo //x"` reads `//x"` as a comment |
+| Go | A `//lint:ignore Check reason` directive has no second `//`, so its reason is never judged. | `//lint:ignore SA1019 see ADR-9` is clean |
 | Java | A `\u000a` escape inside a `//` comment ends the comment in javac, which translates escapes first. Here the comment runs on, so the code after the escape is read as comment text. | `// end \u000a see ADR-9` is C3 even though `see ADR-9` is code |
 | Python, with the `agent-context` pack on | `as requested` and `per the spec` match ordinary prose in a comment. Pinned by `tests/test_known_false_positives.py`. | `# calling CloseHandle as requested in [1]` and `# Map conditions (per the spec) to signals` are C3 |
 

@@ -95,7 +95,8 @@ class TestDirectives(unittest.TestCase):
 
     def test_comments_that_only_look_like_directives_are_prose(self):
         for text in ("// go:build linux\n// two\n", "//go: build\n// two\n", "//Go:build x\n// two\n",
-                     "//nolint\n// two\n", "//lines a.go:10\n// two\n", "// +builder x\n// two\n"):
+                     "// nolint\n// two\n", "//nolintx\n// two\n", "//lines a.go:10\n// two\n",
+                     "// +builder x\n// two\n"):
             self.assertEqual(found("a.go", text), [("C1", 1)], text)
 
     def test_a_directive_inside_a_raw_string_is_content(self):
@@ -121,6 +122,30 @@ class TestDirectiveReasons(unittest.TestCase):
 
     def test_a_directive_without_a_reason_is_still_not_read(self):
         self.assertEqual(found("a.go", "//go:embed docs/*\nvar d embed.FS\n"), [])
+
+    def test_a_reason_may_follow_a_tab(self):
+        self.assertEqual(found("a.go", "//nolint:gosec\t// see ADR-12\nx := 1\n"), [("C3", 1)])
+        self.assertEqual(comments("a.go", "//nolint:gosec\t// see ADR-12\n"), [["// see ADR-12"]])
+
+    def test_slashes_inside_a_quoted_argument_start_no_reason(self):
+        self.assertEqual(found("a.go", '//go:generate sh -c "echo // see ADR-9"\n'), [])
+        self.assertEqual(found("a.go", '//go:generate sh -c "a \\" // see ADR-9"\n'), [])
+        self.assertEqual(found("a.go", "//go:generate sh -c `echo // see ADR-9`\n"), [])
+
+    def test_a_reason_after_a_quoted_argument_is_read(self):
+        self.assertEqual(found("a.go", '//go:generate sh -c "a" // see ADR-9\n'), [("C3", 1)])
+        self.assertEqual(found("a.go", "//go:generate sh -c `a` // see ADR-9\n"), [("C3", 1)])
+
+    def test_an_unclosed_quote_in_a_directive_leaves_no_reason(self):
+        self.assertEqual(found("a.go", '//go:generate sh -c "echo // see ADR-9\n'), [])
+        self.assertEqual(found("a.go", "//go:generate sh -c `echo // see ADR-9\n"), [])
+
+    def test_a_bare_nolint_is_a_directive(self):
+        self.assertEqual(found("a.go", "//nolint\n// one line\nx := 1\n"), [])
+        self.assertEqual(found("a.go", "x := 1\n//nolint\t\n// one line\n"), [])
+
+    def test_a_reason_after_a_bare_nolint_is_read(self):
+        self.assertEqual(found("a.go", "//nolint // see ADR-9\n"), [("C3", 1)])
 
 
 if __name__ == "__main__":

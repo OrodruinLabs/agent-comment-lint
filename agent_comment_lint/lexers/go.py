@@ -5,8 +5,10 @@ from . import clike
 from .base import CODE, COMMENT, STRING, Family, Line
 
 GO = clike.Syntax(False, False, "backtick", False, "simple", False)
-# What go/ast's isDirective accepts, and the `// +build` line that came before `//go:build`.
-DIRECTIVE = re.compile(r"//(?:line |extern |export |[a-z0-9]+:[a-z0-9])|//[ \t]*\+build(?:[ \t]|$)")
+# What go/ast's isDirective accepts, a bare `//nolint`, and the `// +build` line that came before `//go:build`.
+DIRECTIVE = re.compile(r"//(?:line |extern |export |[a-z0-9]+:[a-z0-9]|nolint(?:[ \t]|$))|//[ \t]*\+build(?:[ \t]|$)")
+# In a directive, a quoted argument is skipped whole; a quote that never closes leaves no reason to find.
+DIRECTIVE_PART = re.compile(r'"(?:\\.|[^"\\])*"|`[^`]*`|(?P<unclosed>["`])|[ \t](?P<reason>//)')
 
 _lex = clike.lexer(GO)
 
@@ -20,13 +22,23 @@ def _is_directive(line):
     return kind == COMMENT and not lead.strip() and DIRECTIVE.match(text) is not None
 
 
+def _reason_start(raw):
+    """Index of the `//` that starts a directive's reason: after a space or tab, outside quotes; None when none."""
+    for part in DIRECTIVE_PART.finditer(raw, len(raw) - len(raw.lstrip()) + 2):
+        if part.group("unclosed"):
+            return None
+        if part.group("reason"):
+            return part.start("reason")
+    return None
+
+
 def _directive_line(line):
-    """The directive as content that opens in a string; from its first ` //` on, a reason is a trailing comment."""
+    """The directive as content that opens in a string; from its reason on, it is a trailing comment."""
     raw = "".join(part for _, part in line.segments)
-    space = raw.find(" //", len(raw) - len(raw.lstrip()) + 2)
-    if space < 0:
+    reason = _reason_start(raw)
+    if reason is None:
         return Line([(CODE, raw)], STRING)
-    return Line([(CODE, raw[:space + 1]), (COMMENT, raw[space + 1:])], STRING)
+    return Line([(CODE, raw[:reason]), (COMMENT, raw[reason:])], STRING)
 
 
 def lex(text):

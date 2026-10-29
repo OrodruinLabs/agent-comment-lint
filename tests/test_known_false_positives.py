@@ -128,10 +128,6 @@ class TestGoDirectiveReasons(unittest.TestCase):
         # There is no second `//`, so the reason is part of the directive.
         self.assertEqual(found("a.go", "//lint:ignore SA1019 see ADR-9\nx := 1\n"), [])
 
-    def test_a_go_generate_argument_that_holds_a_slash_pair_has_the_rest_judged(self):
-        # The text after the first ` //` is a trailing comment, also inside a quoted argument.
-        self.assertEqual(found("a.go", '//go:generate sh -c "echo //x see ADR-9"\n'), [("C3", 1)])
-
 
 class TestJavaUnicodeEscapes(unittest.TestCase):
     def test_a_unicode_newline_escape_in_a_line_comment_is_not_a_line_end(self):
