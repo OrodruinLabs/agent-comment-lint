@@ -71,6 +71,10 @@ class TestRubyLiteralsTheLineScannerDoesNotKnow(unittest.TestCase):
         # The line scanner does not know Ruby's regex literals.
         self.assertEqual(found("a.rb", "/#docs/prefix/ =~ s\n"), [("C3", 1)])
 
+    def test_an_interpolation_inside_a_percent_regex_reads_a_comment(self):
+        # The line scanner does not know `%r{}`, so the `#` that opens an interpolation starts a comment.
+        self.assertEqual(comments("a.rb", "X = %r{a#{B}c}\n"), [["#{B}c}"]])
+
     def test_a_second_heredoc_on_one_line_is_not_tracked(self):
         # Only the first heredoc opened on a line is tracked, so the second payload reads as code.
         self.assertEqual(found("a.rb", "foo(<<~A, <<~B)\na\nA\n# see ADR-7\nB\n"), [("C3", 4)])
@@ -84,6 +88,10 @@ class TestRubyLiteralsTheLineScannerDoesNotKnow(unittest.TestCase):
         with self.assertRaises(LexError):
             engine.check_text("a.rb", "puts x if a <<b\n")
 
+    def test_a_heredoc_after_a_binary_sign_is_not_followed(self):
+        # A sign right after a word is read as binary, and `<<` after it as an append, so the payload reads as code.
+        self.assertEqual(found("a.rb", "x = a+<<EOS\n# see ADR-7\nEOS\n"), [("C3", 2)])
+
 
 class TestMakefileShapesTheLexerDoesNotKnow(unittest.TestCase):
     def test_the_text_after_a_semicolon_on_a_rule_line_reads_make_syntax(self):
@@ -94,12 +102,6 @@ class TestMakefileShapesTheLexerDoesNotKnow(unittest.TestCase):
         # `.RECIPEPREFIX` is not read, so a recipe line behind it is make syntax.
         self.assertEqual(found("Makefile", '.RECIPEPREFIX = >\nall:\n> echo "# ADR-9"\n'), [("C3", 3)])
 
-    def test_an_interpolation_inside_a_percent_regex_reads_a_comment(self):
-        # The line scanner does not know `%r{}`, so the `#` that opens an interpolation starts a comment.
-        self.assertEqual(comments("a.rb", "X = %r{a#{B}c}\n"), [["#{B}c}"]])
-
-
-class TestMakefileDefineComments(unittest.TestCase):
     def test_a_comment_line_inside_a_define_block_is_not_read(self):
         # The body of a `define` is content, so a comment written in it is never judged.
         self.assertEqual(found("Makefile", "define rule\n# see ADR-7\nendef\n"), [])

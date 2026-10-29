@@ -144,6 +144,9 @@ The exact patterns are in `agent_comment_lint/governance.py`.
 | Dockerfile | `.dockerfile`, and the names `Dockerfile` and `Containerfile` | `#` at the start of a line |
 | Makefile | `.mk`, and the names `Makefile`, `makefile` and `GNUmakefile` | `#` |
 
+Names and extensions match exactly and case-sensitively, so `Dockerfile.dev`, `api.Dockerfile` and `x.containerfile`
+are not covered.
+
 Never judged, in any repository: files under `node_modules`, `bin`, `obj`, `.terraform`, `dist`, `build`, `coverage`,
 `.git`, `.claude`, `generated`, `Migrations`, `.venv`, `venv`, `__pycache__` or `.pytest_cache`, and any
 `.terraform.lock.hcl`.
@@ -301,21 +304,37 @@ governance list are the policy. There is no inline suppression.
   parse.
 - Ruby is read one line at a time. A string that does not close on its line leaves that line unjudged. Heredoc
   payload (`<<ID`, `<<-ID`, `<<~ID`, quoted identifiers) is content, and a `=begin` / `=end` block is one comment
-  block. A plain `<<ID` ends at a terminator in column zero, while `<<-ID` and `<<~ID` may be indented. An
-  unterminated heredoc or `=begin` is exit code 2. It does not know character literals, percent literals, regex
-  literals, a second heredoc on one line, backtick heredocs or `__END__`.
+  block. A heredoc opens after a line start, a space or one of `( , = [ { ! & | ;`, also through one unary `+` or
+  `-`, as in `[<<~SQL, id]` and `+<<~EOS`. After a word or `)` the `<<` is an append, `:<<` is a symbol, and
+  `class <<self` opens the singleton class. A plain `<<ID` ends at a terminator in column zero, while `<<-ID` and
+  `<<~ID` may be indented. A first-line `#!` is not prose, and a line that is exactly `__END__` ends the source, so
+  the data after it is never judged. An unterminated heredoc or `=begin` is exit code 2. It does not know character
+  literals, percent literals, regex literals, a second heredoc on one line or backtick heredocs.
 - TOML is read across lines. Basic, literal and multi-line strings are content, so a `#` inside them opens no
-  comment, and a comment after a closing triple quote is read. A multi-line string that never closes is exit code 2.
+  comment, and a comment after a closing triple quote is read. A one-line string that does not close leaves its line
+  unjudged. A multi-line string that never closes is exit code 2.
 - A Dockerfile line is a comment only when `#` is its first non-blank character, so a `#` after an instruction is
   shell text. A comment inside a continued instruction is judged. Parser directives (`syntax`, `escape`, `check`)
   above the first comment, blank line or instruction are not prose, and `escape` sets the continuation character.
-  Heredoc payload of `RUN`, `COPY` and `ADD` (also after `ONBUILD`) is content. An unterminated heredoc is exit
-  code 2.
+  Heredoc payload of `RUN`, `COPY` and `ADD` (also after `ONBUILD`) is content. A heredoc opens as BuildKit opens
+  one, from a whole word of the instruction with its lines joined, where quotes protect whitespace. The word is
+  optional digits, `<<`, an optional `-`, and then the name, maybe quoted, made of letters, digits, `_`, `-` and `.`,
+  as in `<<END-OF-FILE` and `3<<EOF`. So `<< EOF`, a bare `<<` as in `$((a << b))`, and `a<<EOF` open nothing. The
+  terminator must equal the name once the line break is gone, and for `<<-` the leading tabs, so `  EOF` is payload.
+  An unterminated heredoc is exit code 2.
 - A Makefile line is make syntax, where a `#` that is not escaped as `\#`, and not inside a `$( )` or `${ }`
-  reference, starts a comment and quotes do not protect it. A tab line is a recipe, read like shell: a `#` starts a
-  comment only where a word could start. A comment that ends in a backslash continues onto the next line. A
-  `define` block, nested ones counted, is content. A `define` that never closes, a reference that never closes
-  and a recipe quote that never closes are exit code 2. It does not read `.RECIPEPREFIX` or the recipe after `;`.
+  reference, starts a comment and quotes do not protect it. A comment that ends in a backslash continues onto the
+  next line, and its lines are one block. A line continued inside a reference is never read as a comment line. A
+  first-line `#!` is not prose.
+- A Makefile tab line is a recipe only while a rule is open, as in GNU make. A rule opens at a line with a `:` outside
+  references that comes before any assignment operator. It stays open across blank lines, comments, recipes and the
+  conditionals `ifeq`, `ifneq`, `ifdef`, `ifndef`, `else` and `endif`, and closes at any other line, such as an
+  assignment, a target-specific variable (`all: X = 1`), `define`, `include`, `export` or `vpath`. A tab line
+  anywhere else is make syntax. A recipe is read like shell after make's prefix of blanks, `@`, `-` and `+`: a `#`
+  starts a comment only where a word could start, and `@# x` lines join a comment block as `# x` lines do.
+- A Makefile `define` block is content, so a comment written inside one is never judged. Inside it a tab line is
+  content and only a bare `define` nests. A `define` that never closes, a reference that never closes and a recipe
+  quote that never closes are exit code 2. It does not read `.RECIPEPREFIX` or the recipe after `;`.
 - A comment block can be split by blank lines into separate one-line blocks, and each passes C1. Joining such runs
   flagged many legitimately separate comments, so it is not done. The write-time hook's message tells the agent that
   splitting is not a fix.
@@ -333,8 +352,7 @@ accident.
 | Makefile | The text after `;` on a rule line is read as make syntax, so quotes do not protect a hash. `.RECIPEPREFIX` is not read, so a recipe behind a custom prefix is make syntax too. | `all: ; echo "# docs/x"` is C3 |
 | Ruby | A `#` in a character literal, a percent literal or a regex literal starts a comment, also the `#{ }` that opens an interpolation in a regex. | `x = ?#docs/prefix`, `%w[a #docs/prefix]` and `/#docs/prefix/ =~ s` are C3 |
 | Ruby | Only the first heredoc opened on a line is followed, and a backtick heredoc is not one. The payload of the others reads as code. | `foo(<<~A, <<~B)` leaves the payload of `B` judged |
-| Ruby | A space before `<<` and a word after it is taken as a heredoc opener, also for an append, and an unterminated one is exit code 2. | `puts x if a <<b` is exit code 2 |
-| Makefile | A comment written inside a `define` block is content, so it is never judged. | `# see ADR-7` between `define` and `endef` is not reported |
+| Ruby | A `<<` with a word right after it is taken as a heredoc opener after a space, a unary sign or one of `( , = [ { ! & \| ;`, also for an append, and an unterminated one is exit code 2. After a word and a binary sign it is not, so that heredoc's payload is judged. | `puts x if a <<b` is exit code 2, and `x = a+<<EOS` leaves its payload judged |
 | C# | Lines inside a multi-line verbatim string `@"..."` are judged as code. | `// ...` lines inside one are a C1 block |
 | Python, with the `agent-context` pack on | `as requested` and `per the spec` match ordinary prose in a comment. Pinned by `tests/test_known_false_positives.py`. | `# calling CloseHandle as requested in [1]` and `# Map conditions (per the spec) to signals` are C3 |
 

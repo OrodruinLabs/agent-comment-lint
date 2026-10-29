@@ -6,7 +6,8 @@
   (`.toml`), Dockerfile (`Dockerfile`, `Containerfile` and `.dockerfile`) and Makefile (`Makefile`, `makefile`,
   `GNUmakefile` and `.mk`). Ruby follows heredocs and `=begin` / `=end` blocks, TOML follows multi-line strings,
   Dockerfile reads parser directives and follows heredocs, and Makefile reads recipes as shell and `define` blocks as
-  content. A string, heredoc, block or `define` that never closes is exit code 2.
+  content. A heredoc, `=begin` block, TOML multi-line string, `define`, make reference or recipe quote that never
+  closes is exit code 2.
 - Both `.pre-commit-hooks.yaml` ids match the new files.
 - Findings move only for files of these languages, which were skipped before. Nothing moves for any other file.
 

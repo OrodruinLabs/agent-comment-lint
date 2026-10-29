@@ -59,7 +59,7 @@ The numbers skip because C2, C4 and C6 need a compiler or human judgment, and th
     <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/ruby/ruby-original.svg" width="44" height="44" alt=""><br><b>Ruby</b><br><sub><code>.rb</code> <code>.rake</code> <code>.gemspec</code> <code>Gemfile</code> <code>Rakefile</code></sub></td>
     <td align="center" width="25%"><img src="https://cdn.simpleicons.org/toml/9C4121" width="44" height="44" alt=""><br><b>TOML</b><br><sub><code>.toml</code></sub></td>
     <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/docker/docker-original.svg" width="44" height="44" alt=""><br><b>Dockerfile</b><br><sub><code>Dockerfile</code> <code>Containerfile</code> <code>.dockerfile</code></sub></td>
-    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/gnu/A42E2B" width="44" height="44" alt=""><br><b>Makefile</b><br><sub><code>Makefile</code> <code>GNUmakefile</code> <code>.mk</code></sub></td>
+    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/gnu/A42E2B" width="44" height="44" alt=""><br><b>Makefile</b><br><sub><code>Makefile</code> <code>makefile</code> <code>GNUmakefile</code> <code>.mk</code></sub></td>
   </tr>
 </table>
 </div>

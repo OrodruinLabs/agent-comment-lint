@@ -86,9 +86,6 @@ class TestHeredocs(unittest.TestCase):
         self.assertEqual(found("a.rb", "s = +<<~EOS\n  # one\n  # two\nEOS\n"), [])
         self.assertEqual(found("a.rb", "s = -<<~EOS\n  # see ADR-7\nEOS\n"), [])
 
-    def test_a_sign_after_a_word_is_not_a_unary_sign(self):
-        self.assertEqual(found("a.rb", "x = a+<<b\n# see ADR-7\n"), [("C3", 2)])
-
     def test_the_symbol_for_the_append_method_opens_nothing(self):
         self.assertEqual(found("a.rb", "alias_method :<<, :push\n# see ADR-7\n"), [("C3", 2)])
         self.assertEqual(found("a.rb", "send(:<<EOS)\n# see ADR-7\n"), [("C3", 2)])
