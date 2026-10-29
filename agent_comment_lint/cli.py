@@ -8,7 +8,7 @@ from . import __version__
 from . import config as settings
 from . import engine, gitio, hook, report, session
 from .diff import parse_diff_ranges
-from .lexers import EXTENSIONS, LexError
+from .lexers import EXTENSIONS, LexError, family_for
 
 DESCRIPTION = "Check code comments against fixed rules. Exit 0 clean, 1 violations, 2 could not scan."
 SCOPE_NOTE = "Covered file types: %s" % " ".join(EXTENSIONS)
@@ -472,8 +472,9 @@ def _judge_target(run, root, cwd, load_config, follow_worktrees, target, title):
         if target.must_apply:
             run.errors.append((relative, None, PATCH_NOT_APPLIED))
         return
-    # A source the policy never judges holds no judged line, so a move from it brings in every line as new.
-    before = current if _judged(config, source) else None
+    # A source the policy never judges, or reads as another language, holds no line judged as this one, so all are new.
+    judged_alike = _judged(config, source) and family_for(source) is family_for(relative)
+    before = current if judged_alike else None
     run.judge(relative, after, hook.changed_ranges(before, after))
 
 

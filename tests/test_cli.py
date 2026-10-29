@@ -1322,6 +1322,22 @@ class TestHookCodex(Sandbox):
                 self.assertEqual(code, 2)
                 self.assertIn("moved.py:1: C1: 3-line prose block (limit 1)", err)
 
+    def test_a_move_from_a_file_read_as_another_language_judges_every_line(self):
+        for source, text, old, new, destination, finding in (
+                ("a.css", "// one\n// two\n// three\nx {}\n", "x {}", "y {}", "b.ts", "b.ts:1: C1:"),
+                ("a.py", "x = '''\n# one\n# two\n# three\n'''\n", "x = '''", "x='''", "b.sh", "b.sh:2: C1:")):
+            with self.subTest(source=source):
+                self.write_bytes(source, text.encode("utf-8"))
+                code, _out, err = self.run_codex("*** Update File: " + source, "*** Move to: " + destination, "@@",
+                                                 "-" + old, "+" + new)
+                self.assertEqual(code, 2)
+                self.assertIn(finding, err)
+
+    def test_a_move_within_one_language_judges_only_the_lines_it_changes(self):
+        self.write_bytes("a.js", b"// one\n// two\n// three\nconst x = 1;\n")
+        self.assertEqual(self.run_codex("*** Update File: a.js", "*** Move to: moved.ts", "@@", "-const x = 1;",
+                                        "+const x = 2;"), (0, "", ""))
+
     def test_a_move_from_a_judged_file_judges_only_the_lines_it_changes(self):
         self.write("a.py", "# one\n# two\n# three\nx = 1\n")
         self.assertEqual(self.run_codex("*** Update File: a.py", "*** Move to: moved.py", "@@", "-x = 1", "+x = 2"),

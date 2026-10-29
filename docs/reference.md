@@ -435,8 +435,9 @@ from the file avoid it.
 - Event: `PreToolUse` for `apply_patch`. `tool_input.command` is the patch text.
 - Mapping: each Add is judged as a new file. Each Update is applied to the file on disk and judged on the changed
   lines. A moved file is judged at its destination, on the lines changed relative to its source. When the policy
-  does not judge the source (another file type, a skipped folder or an excluded path), every line of the
-  destination counts as changed. A Delete is not judged. Relative paths resolve against the event's `cwd`. A patch
+  does not judge the source (another file type, a skipped folder or an excluded path), or reads it as another
+  language (`.css` to `.ts`, `.py` to `.sh`, or `.ts` to `.tsx`), every line of the destination counts as changed.
+  A Delete is not judged. Relative paths resolve against the event's `cwd`. A patch
   Codex itself would refuse is blocked, with its reason. Context that matches nothing is blocked as above.
 - Install, per project: put `agent-comment-lint` on PATH, copy `integrations/codex/hooks.json` to
   `<repo>/.codex/hooks.json`, copy the guard scripts to `<repo>/.codex/`, and review and trust the hook with `/hooks`.
