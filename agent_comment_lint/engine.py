@@ -1,4 +1,4 @@
-"""Judging one file: pick its lexer by extension, lex the text, apply the rules. No I/O."""
+"""Judging one file: pick its lexer by exact file name and then by extension, lex the text, apply the rules. No I/O."""
 from collections import namedtuple
 
 from . import rules
@@ -10,7 +10,7 @@ FileResult.__doc__ = "The findings for one file, and how many of its lines the l
 
 
 def in_scope(path):
-    """True when the path's extension belongs to a covered language."""
+    """True when the path belongs to a covered language, by exact file name and then by extension."""
     return family_for(path) is not None
 
 
