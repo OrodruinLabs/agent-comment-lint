@@ -475,7 +475,6 @@ class TestCodexTemplate(unittest.TestCase):
 
 
 WINDSURF_HOOKS = os.path.join(REPO, "integrations", "windsurf", "hooks.json")
-WINDSURF_BASH = shutil.which("bash") or SHELL
 WINDSURF_WRITE = "windsurf-write"
 
 
@@ -516,22 +515,22 @@ class TestWindsurfTemplate(unittest.TestCase):
             if os.name == "nt":
                 command = ["powershell", "-NoProfile", "-Command", profile + self.handler()["powershell"]]
             else:
-                command = [WINDSURF_BASH, "-c", self.handler()["command"]]
+                command = [BASH, "-c", self.handler()["command"]]
             return subprocess.run(command, input=json.dumps(event).encode("utf-8"), cwd=root, env=env,
                                   capture_output=True)
 
-    @unittest.skipUnless(WINDSURF_BASH or os.name == "nt", "no POSIX shell on PATH")
+    @unittest.skipUnless(BASH or os.name == "nt", "no POSIX shell on PATH")
     def test_a_write_adding_a_two_line_comment_is_blocked(self):
         done = self.run_hook("// one\n// two\n")
         self.assertEqual(done.returncode, 2, done.stderr)
         self.assertIn(b"dirty.ts:1: C1: 2-line prose block (limit 1)", done.stderr)
 
-    @unittest.skipUnless(WINDSURF_BASH or os.name == "nt", "no POSIX shell on PATH")
+    @unittest.skipUnless(BASH or os.name == "nt", "no POSIX shell on PATH")
     def test_a_clean_write_passes_silently(self):
         done = self.run_hook("const a = 1;\n")
         self.assertEqual((done.returncode, done.stdout, done.stderr), (0, b"", b""))
 
-    @unittest.skipUnless(WINDSURF_BASH or os.name == "nt", "no POSIX shell on PATH")
+    @unittest.skipUnless(BASH or os.name == "nt", "no POSIX shell on PATH")
     def test_a_missing_guard_is_blocked_with_two_and_a_reason(self):
         done = self.run_hook("const a = 1;\n", guards=())
         self.assertEqual(done.returncode, 2)
@@ -598,7 +597,8 @@ class TestGeminiTemplate(unittest.TestCase):
                                   capture_output=True)
 
     def forms(self):
-        if BASH:
+        # Gemini never runs the POSIX form on Windows, and Git's bash there cannot find the `.cmd` fake command.
+        if BASH and os.name != "nt":
             yield False
         if os.name == "nt":
             yield True
