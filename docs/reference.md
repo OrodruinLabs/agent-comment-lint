@@ -253,7 +253,7 @@ entry states its reason:
 
 The write-time hook and the end-of-session check read the file as committed at HEAD, so an exclusion an agent adds
 reaches them only after a human commits it. Outside git, before the first commit, and with `--config`, they read the
-file on disk. Every other mode reads it from disk.
+file on disk. Every other mode reads it from disk. The file must be a regular file, not a symlink.
 
 - `$schema` is optional and ignored by the check. It lets editors validate and complete the file.
 - `exclude[].path` is relative to the repository root. `*` and `?` match inside one directory, `**` crosses
@@ -351,21 +351,34 @@ A file written through Bash or another tool never reaches the write-time hook. T
 Claude stops. A `SessionStart` entry records a snapshot of the working tree, and a `Stop` entry judges what changed
 since. Both run the same wrapper and `--hook`, which dispatches on the event's `hook_event_name`.
 
-- What is judged: every covered file whose content differs from the snapshot, on the lines changed since it. A file
-  new since the snapshot is judged whole. A file the session never touched is never read, so an old comment or a
-  broken file the session left alone cannot block.
+- What is judged: lines changed since the session started and not yet committed. A line counts only where it differs
+  both from the snapshot and from HEAD, so a checkout, pull, rebase or reset during the session brings in no old
+  line. A file created during the session and absent from HEAD is judged whole. A file the session never touched is
+  never read, so an old comment or a broken file the session left alone cannot block. Lines the session commits are
+  left to pre-commit (the `agent-comment-lint-staged` id) and CI. Before the first commit, every line changed since
+  the snapshot counts.
 - A file that changed during the session and cannot be scanned blocks, as exit code 2. So does one that is not
   UTF-8 text, as at write time.
 - On findings the hook exits 2 with the same teaching report, opening "Before you finish:", and Claude keeps working.
 - The snapshot is a git tree built from a temporary index. It writes no ref, no index and nothing in the working
   tree, only git objects and a file under `git rev-parse --git-path agent-comment-lint/sessions`. Files older than
-  seven days there are removed.
+  seven days there are removed. A merge or rebase stopped on a conflict does not stop it: a covered file is taken
+  from disk, and an unmerged file the policy does not cover is left out.
 - No snapshot means no check. The session ends normally when the plugin was installed mid-session, taking the snapshot
-  failed, or the directory is not a git work tree. The snapshot is the first one recorded for the session id, so a
-  resumed or compacted session with none gets one at that moment, and the check covers changes from then on. Once a
-  snapshot is found, a git failure at stop blocks.
-- Known limit: edits a human makes in their editor during the session count as session changes.
-- Known limit: only the project directory's own working tree is covered, not sibling worktrees.
+  failed, the directory is not a git work tree, git refuses to read the repository, or the snapshot's objects were
+  pruned (`git gc --prune=now`). The snapshot is the first one recorded for the session id, so a resumed or compacted
+  session with none gets one at that moment, and the check covers changes from then on. Once a snapshot is found, a
+  git failure at stop blocks.
+- How to reset: delete `$(git rev-parse --git-path agent-comment-lint/sessions)/<session id>`, or start a new session.
+- Known limits:
+  - Edits a human makes during the session count as the session's own until they are committed.
+  - A session resumed later still judges from its first snapshot, kept for at least seven days, so everything left
+    uncommitted since it first started counts.
+  - Two sessions in one checkout each judge what the other changes while both are open.
+  - Generated files a build changes during the session are judged. Exclude them in the committed settings.
+  - A merge, rebase or cherry-pick stopped on a conflict leaves the other side's lines uncommitted, so they are judged
+    until it is committed.
+  - Only the project directory's own working tree is covered, not sibling worktrees.
 - Claude Code caps forced continuations at 8 in a row, and nothing here tries to get around that.
 
 ## Versions

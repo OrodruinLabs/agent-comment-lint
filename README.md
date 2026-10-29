@@ -76,7 +76,7 @@ changes your results without a commit of yours.
 macOS, Linux and Windows are supported. The plugin finds Python as `AGENT_COMMENT_LINT_PYTHON`, `python3`, `python`,
 then `py -3`. A write that adds a bad comment is blocked, and Claude sees why. Old comments the write
 leaves alone never block it. When Claude stops, the plugin also checks the comments written any other way, such as
-through Bash, on the lines changed since the session started. To turn it on for a whole team, see [Claude Code setup](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#claude-code).
+through Bash, on the lines changed since the session started and not yet committed. To turn it on for a whole team, see [Claude Code setup](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#claude-code).
 
 ### GitHub Actions
 
