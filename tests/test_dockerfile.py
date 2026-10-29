@@ -84,6 +84,12 @@ class TestHeredocs(unittest.TestCase):
     def test_a_heredoc_marker_on_another_instruction_opens_nothing(self):
         self.assertEqual(found("Dockerfile", "LABEL a=<<EOF\n# see ADR-9\n"), [("C3", 2)])
 
+    def test_an_onbuild_heredoc_payload_is_content(self):
+        self.assertEqual(found("Dockerfile", "ONBUILD RUN <<EOF\n# ADR-9\nEOF\n# see ADR-8\n"), [("C3", 4)])
+
+    def test_an_onbuild_without_a_heredoc_instruction_opens_nothing(self):
+        self.assertEqual(found("Dockerfile", "ONBUILD <<EOF\n# see ADR-9\n"), [("C3", 2)])
+
     def test_an_unterminated_heredoc_cannot_be_lexed(self):
         with self.assertRaises(LexError) as caught:
             family_for("Dockerfile").lex("FROM x\nRUN <<EOF\nx\n")

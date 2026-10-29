@@ -23,6 +23,14 @@ def _heredoc_openers(raw):
         masked = " " * hit.end() + masked[hit.end():]
 
 
+def _instruction_word(stripped):
+    """The upper-cased instruction keyword, looking through a leading ONBUILD."""
+    words = stripped.split(None, 2)
+    if words[0].upper() == "ONBUILD" and len(words) > 1:
+        return words[1].upper()
+    return words[0].upper()
+
+
 def _comment_line(raw):
     body = raw.lstrip()
     lead = raw[:len(raw) - len(body)]
@@ -61,7 +69,7 @@ def lex(text):
         if not stripped:
             continue
         if not continuing:
-            heredocs_allowed = stripped.split(None, 1)[0].upper() in HEREDOC_INSTRUCTIONS
+            heredocs_allowed = _instruction_word(stripped) in HEREDOC_INSTRUCTIONS
         if heredocs_allowed:
             pending.extend((word, strips_tabs, number) for word, strips_tabs in _heredoc_openers(raw))
         continuing = stripped.endswith(escape)
