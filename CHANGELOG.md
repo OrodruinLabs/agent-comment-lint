@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.0
+
+- End-of-session check: a new check at Stop, in the plugin only. A snapshot taken at session start lets it judge only
+  what the session changed, so a comment the session did not touch is never reported. No finding in any other mode
+  moves.
+- `--staged` and `agent-comment-lint-staged`: `--staged` judges only the lines staged for the next commit, read from
+  the index, so a partly staged file is judged as it will be committed. The new pre-commit id
+  `agent-comment-lint-staged` runs it. The existing `agent-comment-lint` id is unchanged, so no verdict moves.
+- Session-start guidance: the plugin adds two lines of comment guidance at session start. Moves no finding.
+- Committed settings: the hook and the end-of-session check read the settings file as committed at HEAD, so an
+  exclusion an agent adds to the file does not excuse the write that prompted it. Moves findings in hook mode only,
+  where a settings file has uncommitted changes. Outside git, before the first commit, and with `--config`, the
+  file on disk is still read.
+
 ## 1.2.0
 
 - Platforms: runs on macOS, Linux and native Windows, with CI on all three. The hook wrapper looks for Python as

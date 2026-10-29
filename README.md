@@ -63,7 +63,7 @@ JSX and TSX are included. Other files are skipped, and so are dependency and bui
 
 ## Setup
 
-Pick where it runs; every channel runs the same check. The snippets pin `v1.2.0`. Keep a pin, so a new release never
+Pick where it runs; every channel runs the same check. The snippets pin `v1.3.0`. Keep a pin, so a new release never
 changes your results without a commit of yours.
 
 ### Claude Code
@@ -89,7 +89,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: OrodruinLabs/agent-comment-lint@v1.2.0
+      - uses: OrodruinLabs/agent-comment-lint@v1.3.0
 ```
 
 Only the lines the pull request changes are checked. Keep `fetch-depth: 0`, or the step cannot see what changed and
@@ -101,7 +101,7 @@ lists them all. The inputs are in [the reference](https://github.com/OrodruinLab
 ```yaml
 repos:
   - repo: https://github.com/OrodruinLabs/agent-comment-lint
-    rev: v1.2.0
+    rev: v1.3.0
     hooks:
       - id: agent-comment-lint-staged
 ```
@@ -112,15 +112,15 @@ To judge each staged file whole instead, use `id: agent-comment-lint`, and fix o
 ### Command line
 
 ```
-uv tool install agent-comment-lint==1.2.0
-pipx install agent-comment-lint==1.2.0
+uv tool install agent-comment-lint==1.3.0
+pipx install agent-comment-lint==1.3.0
 ```
 
 To install from the repository instead:
 
 ```
-uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.2.0
-pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.2.0
+uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.3.0
+pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.3.0
 ```
 
 `uvx agent-comment-lint` runs it without installing, which suits CI and trials.
@@ -151,7 +151,7 @@ are no limits to change and no way to silence one comment inline. Every entry st
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.2.0/schema/agent-comment-lint.schema.json",
+  "$schema": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.3.0/schema/agent-comment-lint.schema.json",
   "exclude": [{ "path": "vendor/", "reason": "third-party code" }],
   "governance": {
     "packs": ["azure-boards"],
