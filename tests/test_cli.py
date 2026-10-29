@@ -1376,6 +1376,13 @@ class TestHookCodex(Sandbox):
         self.assertEqual(code, 2)
         self.assertIn("sub/a.ts:1: C1:", err)
 
+    def test_a_claude_session_event_is_not_a_codex_event(self):
+        for name in ("SessionStart", "Stop"):
+            stdin = json.dumps({"hook_event_name": name, "session_id": "s"})
+            code, _out, err = self.run_cli("--hook", "--agent", "codex", stdin=stdin)
+            self.assertEqual(code, 2)
+            self.assertIn("standard input is not a Codex hook event: ", err)
+
     def test_a_patch_codex_would_refuse_is_blocked_as_not_the_event(self):
         code, _out, err = self.run_codex("*** Update File: a.ts")
         self.assertEqual(code, 2)
