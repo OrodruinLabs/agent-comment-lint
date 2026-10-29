@@ -7,7 +7,7 @@
           {
             "name": "agent-comment-lint",
             "type": "command",
-            "command": "$guard = $GEMINI_PROJECT_DIR + '\\.gemini\\agent-comment-lint-guard.cmd'; if (-not (Test-Path -LiteralPath $guard)) { [Console]::Error.WriteLine('Blocked: agent-comment-lint guard is missing.'); exit 2 }; & $guard gemini; if ($LASTEXITCODE -ne 0) { exit 2 }; exit 0"
+            "command": "$guard = $GEMINI_PROJECT_DIR + '\\.gemini\\agent-comment-lint-guard.cmd'; if (-not (Test-Path -LiteralPath $guard)) { [Console]::Error.WriteLine('Blocked: agent-comment-lint guard is missing.'); exit 2 }; $global:LASTEXITCODE = 1; & $guard gemini; if ($LASTEXITCODE -ne 0) { exit 2 }; exit 0"
           }
         ]
       }

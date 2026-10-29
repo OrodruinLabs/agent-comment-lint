@@ -502,7 +502,7 @@ class TestWindsurfTemplate(unittest.TestCase):
         self.assertIn("agent-comment-lint-guard.cmd", handler["powershell"])
         self.assertIn("windsurf", handler["powershell"])
 
-    def run_hook(self, new_string, guards=(".sh", ".cmd"), profile=""):
+    def run_hook(self, new_string, guards=(".sh", ".cmd"), profile="", directory=False, body=None):
         """Cascade runs `bash -c command`, or `powershell -Command powershell`, in the workspace root."""
         with tempfile.TemporaryDirectory() as tmp:
             root = os.path.join(os.path.realpath(tmp), "repo")
@@ -511,10 +511,12 @@ class TestWindsurfTemplate(unittest.TestCase):
             shutil.copy(WINDSURF_HOOKS, os.path.join(root, ".devin"))
             for suffix in guards:
                 shutil.copy(GUARD + suffix, os.path.join(root, ".devin"))
+            if directory:
+                os.mkdir(os.path.join(root, ".devin", "agent-comment-lint-guard.cmd"))
             bin_dir = os.path.join(tmp, "bin")
             os.mkdir(bin_dir)
             arguments = "%*" if os.name == "nt" else '"$@"'
-            fake_command(bin_dir, '"%s" -m agent_comment_lint %s' % (sys.executable, arguments))
+            fake_command(bin_dir, body or '"%s" -m agent_comment_lint %s' % (sys.executable, arguments))
             env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ["PATH"], PYTHONPATH=REPO,
                        GIT_CEILING_DIRECTORIES=os.path.realpath(tmp))
             event = fixture(WINDSURF_WRITE)
@@ -550,6 +552,16 @@ class TestWindsurfTemplate(unittest.TestCase):
         self.assertEqual(done.returncode, 2)
         self.assertIn(b"guard is missing", done.stderr)
 
+    @unittest.skipUnless(os.name == "nt", "only the PowerShell form reads an exit code a profile left behind")
+    def test_a_directory_in_place_of_the_guard_is_blocked_after_a_profile_ran_a_native_command(self):
+        done = self.run_hook("const a = 1;\n", guards=(), profile="cmd /c exit 0; ", directory=True)
+        self.assertEqual(done.returncode, 2)
+
+    @unittest.skipUnless(os.name == "nt", "only the PowerShell form reads an exit code a profile left behind")
+    def test_a_failing_command_is_blocked_after_a_profile_ran_a_native_command(self):
+        done = self.run_hook("const a = 1;\n", profile="cmd /c exit 0; ", body=exit_body(3))
+        self.assertEqual((done.returncode, done.stderr.strip()), (2, FAILED + b"3."))
+
 
 GEMINI_POSIX = os.path.join(REPO, "integrations", "gemini", "settings.json")
 GEMINI_WINDOWS = os.path.join(REPO, "integrations", "gemini", "settings.windows.json")
@@ -578,17 +590,20 @@ class TestGeminiTemplate(unittest.TestCase):
         self.assertIn("agent-comment-lint-guard.cmd", windows)
         self.assertIn("gemini", windows)
 
-    def run_hook(self, windows, new_string, guards=(".sh", ".cmd")):
+    def run_hook(self, windows, new_string, guards=(".sh", ".cmd"), profile="", directory=False,
+                 body=None):
         """Gemini rewrites `$GEMINI_PROJECT_DIR` quoted for the shell, then runs `bash -c` or `powershell -Command`."""
         with tempfile.TemporaryDirectory() as tmp:
             root = os.path.join(os.path.realpath(tmp), "repo with space")
             os.makedirs(os.path.join(root, ".gemini"))
             for suffix in guards:
                 shutil.copy(GUARD + suffix, os.path.join(root, ".gemini"))
+            if directory:
+                os.mkdir(os.path.join(root, ".gemini", "agent-comment-lint-guard.cmd"))
             bin_dir = os.path.join(tmp, "bin")
             os.mkdir(bin_dir)
             arguments = "%*" if os.name == "nt" else '"$@"'
-            fake_command(bin_dir, '"%s" -m agent_comment_lint %s' % (sys.executable, arguments))
+            fake_command(bin_dir, body or '"%s" -m agent_comment_lint %s' % (sys.executable, arguments))
             env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ["PATH"], PYTHONPATH=REPO)
             event = fixture("gemini-write")
             event["cwd"] = root
@@ -597,7 +612,7 @@ class TestGeminiTemplate(unittest.TestCase):
                 quoted = "'%s'" % root.replace("'", "''")
                 command = self.handler("settings.windows.json")["command"].replace("$GEMINI_PROJECT_DIR", quoted)
                 command = ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-                           command + "; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }"]
+                           profile + command + "; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }"]
             else:
                 command = self.handler("settings.json")["command"].replace("$GEMINI_PROJECT_DIR", shlex.quote(root))
                 command = [BASH, "-c", command]
@@ -627,3 +642,13 @@ class TestGeminiTemplate(unittest.TestCase):
             done = self.run_hook(windows, "const a = 1;\n", guards=())
             self.assertEqual(done.returncode, 2)
             self.assertNotEqual(done.stderr.strip(), b"")
+
+    @unittest.skipUnless(os.name == "nt", "only the PowerShell form reads an exit code a profile left behind")
+    def test_a_directory_in_place_of_the_guard_is_blocked_after_a_profile_ran_a_native_command(self):
+        done = self.run_hook(True, "const a = 1;\n", guards=(), profile="cmd /c exit 0; ", directory=True)
+        self.assertEqual(done.returncode, 2)
+
+    @unittest.skipUnless(os.name == "nt", "only the PowerShell form reads an exit code a profile left behind")
+    def test_a_failing_command_is_blocked_after_a_profile_ran_a_native_command(self):
+        done = self.run_hook(True, "const a = 1;\n", profile="cmd /c exit 0; ", body=exit_body(3))
+        self.assertEqual((done.returncode, done.stderr.strip()), (2, FAILED + b"3."))

@@ -3,7 +3,7 @@
     "pre_write_code": [
       {
         "command": "sh .devin/agent-comment-lint-guard.sh windsurf || exit 2",
-        "powershell": "if (-not (Test-Path -LiteralPath '.devin\\agent-comment-lint-guard.cmd')) { [Console]::Error.WriteLine('Blocked: agent-comment-lint guard is missing.'); exit 2 }; & '.devin\\agent-comment-lint-guard.cmd' windsurf; if ($LASTEXITCODE -ne 0) { exit 2 }; exit 0",
+        "powershell": "if (-not (Test-Path -LiteralPath '.devin\\agent-comment-lint-guard.cmd')) { [Console]::Error.WriteLine('Blocked: agent-comment-lint guard is missing.'); exit 2 }; $global:LASTEXITCODE = 1; & '.devin\\agent-comment-lint-guard.cmd' windsurf; if ($LASTEXITCODE -ne 0) { exit 2 }; exit 0",
         "show_output": true
       }
     ]
