@@ -152,6 +152,7 @@ turn on only the ones your team uses.
 
 | Pack | Turn it on if you use | It refuses |
 | :--- | :--- | :--- |
+| `agent-context` | AI agents that cite a plan, a chat or a notes file | `Task 8`, `step 3 of the plan`, `per the spec`, `as requested`, `the user asked`, `PLAN.md` |
 | `azure-boards` | Azure Boards | `AB#4321`, `ADO #795`, `ADO 795` |
 | `decision-ids` | numbered decisions | `D-7`, `D-12b`, `D7` |
 | `task-ids` | task ids shaped prefix, dash, letter, number | `WEB-T022`, `AUTH-F053` |

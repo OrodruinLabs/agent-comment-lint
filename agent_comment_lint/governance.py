@@ -35,7 +35,22 @@ CORE = (
     r"(?i:(?:CLAUDE|AGENTS)\.md)",
 )
 
+# An upper-case notes file with a .md suffix, excluding the well-known files that a repository ships.
+NOTES_FILE = (r"\b(?!(?:README|CHANGELOG|LICENSE|CONTRIBUTING|SECURITY|CODE_OF_CONDUCT|CLAUDE|AGENTS)\.md\b)"
+              r"[A-Z][A-Z0-9_]+\.md\b")
+
+# The plan, chat and review citations that an agent leaves in a comment, one shape per pattern.
+AGENT_CONTEXT = (
+    r"\bTask \d+\b",
+    r"(?i:\bstep \d+ (?:of|in) the plan\b)",
+    r"(?i:\bper (?:the )?(?:(?:code )?review|plan|spec)\b)",
+    r"(?i:\bas (?:requested|discussed|agreed)\b)",
+    r"(?i:\bthe user (?:asked|requested)\b)",
+    NOTES_FILE,
+)
+
 PACKS = {
+    "agent-context": AGENT_CONTEXT,
     "azure-boards": (r"AB#\d+", r"(?i:\bADO #?\d{3,}\b)"),
     "decision-ids": (r"\bD-\d+[a-z-]*", DECISION_REF),
     "task-ids": (TASK_ID,),

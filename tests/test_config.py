@@ -65,6 +65,9 @@ class TestGovernance(unittest.TestCase):
             with self.assertRaises(config.ConfigError, msg=repr(value)):
                 self.governance(value)
 
+    def test_the_agent_context_pack_parses(self):
+        self.assertEqual(self.governance({"packs": ["agent-context"]}).packs, ("agent-context",))
+
     def test_an_unknown_pack_names_the_packs_there_are(self):
         with self.assertRaises(config.ConfigError) as caught:
             self.governance({"packs": ["jira"]})

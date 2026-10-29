@@ -101,6 +101,7 @@ its settings file. Nothing can remove a core pattern.
 
 | Pack | Shapes |
 | --- | --- |
+| `agent-context` | `Task 8`, `step 3 of the plan`, `per the spec` (or `per the code review`), `as requested`, `as discussed`, `as agreed`, `the user asked`, `the user requested`, and an upper-case notes file such as `PLAN.md` (not `README.md`, `CHANGELOG.md`, `LICENSE.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CLAUDE.md` or `AGENTS.md`) |
 | `azure-boards` | `AB#4321`, `ADO #795`, `ADO 795` |
 | `decision-ids` | `D-7`, `D-12b`, and `D7` outside a run of hex bytes |
 | `task-ids` | a prefix of two to five capitals, a dash, one capital and two or more digits: `WEB-T022`, `AUTH-F053`, `DATA-P002a` |
@@ -277,6 +278,7 @@ accident.
 | Every language | `docs/` matches anywhere in a comment, also inside a web address. | `// https://developer.mozilla.org/en-US/docs/Web/API/fetch` is C3 |
 | Shell, YAML, HCL | Any `#` outside quotes starts a comment, also inside a parameter expansion. | `x=${y#docs/prefix}` is C3. A line over 120 characters that holds `$#` is C7 |
 | C# | Lines inside a multi-line verbatim string `@"..."` are judged as code. | `// ...` lines inside one are a C1 block |
+| Python, with the `agent-context` pack on | `as requested` and `per the spec` match ordinary prose in a comment. Pinned by `tests/test_known_false_positives.py`. | `# calling CloseHandle as requested in [1]` and `# Map conditions (per the spec) to signals` are C3 |
 
 ## The write-time hook
 

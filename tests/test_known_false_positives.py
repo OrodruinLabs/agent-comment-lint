@@ -1,6 +1,7 @@
 """False positives both earlier copies had, pinned as they are today so that changing one is a decision."""
 import unittest
 
+from agent_comment_lint import engine, governance
 from support import LONG, found
 
 
@@ -36,3 +37,21 @@ class TestCsharpVerbatimStringBody(unittest.TestCase):
     def test_comment_shaped_lines_inside_a_multi_line_verbatim_string_are_a_prose_block(self):
         text = 'var sql = @"select 1\n// one\n// two\n";\nint x;\n'
         self.assertEqual(found("a.cs", text), [("C1", 2)])
+
+
+
+class TestAgentContextFalsePositivesInCpython(unittest.TestCase):
+    """Two CPython comments that the agent-context pack flags, pinned because that pack is opt-in."""
+
+    AGENT_CONTEXT = governance.matcher(("agent-context",))
+
+    def test_as_requested_in_a_cpython_comment_is_a_governance_reference(self):
+        # The pins hold because the core never flags these, and only the opt-in pack does.
+        text = "# which is calling CloseHandle as requested in [1], so there is nothing\n"
+        self.assertEqual(engine.check_text("a.py", text, self.AGENT_CONTEXT).findings[0].message,
+                         "governance reference 'as requested'")
+
+    def test_per_the_spec_in_a_cpython_comment_is_a_governance_reference(self):
+        text = "# Map conditions (per the spec) to signals\n"
+        self.assertEqual(engine.check_text("a.py", text, self.AGENT_CONTEXT).findings[0].message,
+                         "governance reference 'per the spec'")

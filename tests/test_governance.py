@@ -102,3 +102,28 @@ class TestExtras(unittest.TestCase):
     def test_an_extra_keeps_its_own_inline_flags(self):
         tickets = governance.matcher(extras=(self.extra(r"(?i)\bweb-\d+"),))
         self.assertEqual(first_reference("fixed in Web-12", tickets), "Web-12")
+
+
+class TestAgentContextPack(unittest.TestCase):
+    pack = governance.matcher(("agent-context",))
+
+    def test_plan_and_chat_references_are_flagged(self):
+        for comment, reference in (("now reads useDataTypes() itself (Task 8)", "Task 8"),
+                                   ("The user asked for it gone.", "The user asked"),
+                                   ("See INTERNAL_NOTES.md section 4", "INTERNAL_NOTES.md"),
+                                   ("Step 3 of the plan", "Step 3 of the plan"),
+                                   ("as discussed, retry twice", "as discussed"),
+                                   ("per the code review", "per the code review"),
+                                   ("tracked in PLAN.md", "PLAN.md")):
+            self.assertEqual(self.pack.first_reference(comment), reference, comment)
+
+    def test_a_work_item_with_a_hash_is_already_core(self):
+        self.assertEqual(first_reference("(Task #1775)"), "Task #1775")
+
+    def test_ordinary_text_and_well_known_files_are_not_flagged(self):
+        for comment in ("(moved to ./phaseStepper.ts)", "see README.md", "per CHANGELOG.md", "task 8 ran twice",
+                        "A.md is one letter", "Taskbar 8"):
+            self.assertIsNone(self.pack.first_reference(comment), comment)
+
+    def test_the_pack_is_off_unless_named(self):
+        self.assertIsNone(first_reference("now reads it itself (Task 8)"))
