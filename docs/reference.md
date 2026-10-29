@@ -165,7 +165,7 @@ Without an install, `python3 check-agent-comment-lint.py` from a checkout takes 
 | Mode | What it judges |
 | --- | --- |
 | `--diff BASE` | Files changed by the commits since the merge base with `BASE`. A finding is reported when its lines overlap a changed line, so a block that grows is reported from its first line. A renamed file is judged on its changed lines only. A changed file that git treats as binary (a `-diff` attribute, a NUL byte) has no changed lines to read, so the whole file is judged: every line of it counts as changed. A file whose content did not change, because only its mode or its name changed, is not read at all, whether git treats it as text or as binary. Only committed changes count: commit before you run it. |
-| `--staged` | The lines staged for the next commit, with the text read from the index, so a partly staged file is judged as it will be committed. Unstaged edits are ignored. Before the first commit every staged line counts. Selection, binary files and the line count check work as in `--diff`; a staged file that is not UTF-8 text cannot be judged, and is not passed. |
+| `--staged` | The lines staged for the next commit, with the text read from the index, so a partly staged file is judged as it will be committed. Unstaged edits are ignored. Before the first commit every staged line counts. Selection, binary files, the line count check and bytes that are not UTF-8 work as in `--diff`: a text file is judged with such bytes replaced, and a file git treats as binary that is not UTF-8 text cannot be judged, and is not passed. |
 | `--all` | Tracked files and new files that are not ignored, as git lists them. Outside a repository it walks the directory instead. Finding no covered file is exit code 2, not a clean run. |
 | `--files` | The files named. A named file that is out of scope or excluded is not judged. Needs no git. |
 | `--stdin-path` | A proposed file body, for an editor or write-time hook. The file on disk is not read. A fragment of a file may not lex; exit code 2 then means "no verdict", and the hook decides what to do with it. Needs no git. |
@@ -218,7 +218,7 @@ Exit code 2 is never downgraded. These are exit code 2, each with a message that
   not add up, the file is not passed as "no changed lines".
 - `--diff` when a changed file that git treats as binary is not UTF-8 text, such as a UTF-16 source file, and its
   content changed. It cannot be judged, and it is not passed.
-- `--staged` when a staged file is not UTF-8 text, or its blob cannot be read from the index.
+- `--staged` when a staged file that git treats as binary is not UTF-8 text, or a blob cannot be read from the index.
 - `--diff` when git fails, or when its count of added lines or its list of changed files cannot be read.
 - `--all` in a repository that git cannot read or without a git program. The tree is not walked instead.
 - `--all` that finds no covered file. A mistyped root or an empty checkout must not pass a gate.
@@ -349,7 +349,8 @@ since. Both run the same wrapper and `--hook`, which dispatches on the event's `
 - What is judged: every covered file whose content differs from the snapshot, on the lines changed since it. A file
   new since the snapshot is judged whole. A file the session never touched is never read, so an old comment or a
   broken file the session left alone cannot block.
-- A file that changed during the session and cannot be scanned blocks, as exit code 2.
+- A file that changed during the session and cannot be scanned blocks, as exit code 2. So does one that is not
+  UTF-8 text, as at write time.
 - On findings the hook exits 2 with the same teaching report, opening "Before you finish:", and Claude keeps working.
 - The snapshot is a git tree built from a temporary index. It writes no ref, no index and nothing in the working
   tree, only git objects and a file under `git rev-parse --git-path agent-comment-lint/sessions`. Files older than

@@ -21,6 +21,7 @@ DIFF_MISMATCH = "git counts %d added line(s) but its diff shows %d, so the chang
 BINARY_NOT_TEXT = "git shows no changed lines for it (a binary file) and it is not UTF-8 text, so it cannot be judged"
 HOOK_INPUT = "standard input is not a Claude Code PreToolUse event: %s"
 HOOK_NOT_UTF8 = "is not UTF-8 text, so the write cannot be judged"
+SESSION_NOT_UTF8 = "is not UTF-8 text, so the lines this session changed cannot be judged"
 HOOK_BLOCKED = "Blocked: agent-comment-lint rejects this write.\n"
 HOOK_HEADER = HOOK_BLOCKED + report.HOOK_SCOPE
 HOOK_STOP_HEADER = ("Before you finish: agent-comment-lint found comments this session added that break the policy.\n"
@@ -218,11 +219,14 @@ class _Run:
             return
         self.judge(path, text, ranges)
 
-    def judge_blob(self, path, data, ranges):
+    def judge_blob(self, path, data, ranges, not_utf8=None):
+        """Judge a blob's text; it must be UTF-8 when git calls it binary, or when `not_utf8` says why it must be."""
+        if ranges is None:
+            not_utf8 = BINARY_NOT_TEXT
         try:
-            text = data.decode(ENCODING)
+            text = data.decode(ENCODING, errors="replace" if not_utf8 is None else "strict")
         except UnicodeDecodeError:
-            self.errors.append((path, None, BINARY_NOT_TEXT))
+            self.errors.append((path, None, not_utf8))
             return
         self.judge(path, text, ranges)
 
@@ -281,7 +285,7 @@ def _overlap(ranges, other):
     return shared
 
 
-def _run_changes(run, root, config, span, from_blobs=False, also=None):
+def _run_changes(run, root, config, span, from_blobs=False, not_utf8=None, also=None):
     """Judge the lines the span changes, from disk or from git's blobs; with `also`, only lines both spans change."""
     changed = _changed_ranges(run, root, config, span)
     if also is not None:
@@ -298,7 +302,7 @@ def _run_changes(run, root, config, span, from_blobs=False, also=None):
         run.errors.extend((path, None, str(error)) for path in changed)
         return
     for path, (blob, ranges) in changed.items():
-        run.judge_blob(path, blobs[blob], ranges)
+        run.judge_blob(path, blobs[blob], ranges, not_utf8)
 
 
 def _named(run, root, cwd, config, path):
@@ -380,7 +384,7 @@ def _run_session_end(run, root, load_config, event):
     now = gitio.snapshot_tree(root, _covered_paths(root, config))
     # A line HEAD holds came from a commit, a checkout, a pull or a reset, by anyone; pre-commit and CI judge those.
     head = ("HEAD", now) if gitio.has_head(root) else None
-    _run_changes(run, root, config, (before, now), from_blobs=True, also=head)
+    _run_changes(run, root, config, (before, now), from_blobs=True, not_utf8=SESSION_NOT_UTF8, also=head)
 
 
 def _run_hook(run, root, cwd, load_config, stdin, follow_worktrees):

@@ -598,15 +598,18 @@ class TestStagedMode(Sandbox):
         self.git("add", "a.ts")
         self.assertEqual(self.run_cli("--staged")[0], 1)
 
-    def test_a_staged_file_that_is_not_utf_8_cannot_be_scanned(self):
-        self.write_bytes("a.ts", b"// caf\xe9\n")
+    def test_a_staged_file_that_is_not_utf_8_is_judged_as_diff_judges_it(self):
+        self.write_bytes("a.ts", "// caf\u00e9 one\n// two\n".encode("latin-1"))
         self.git("add", "a.ts")
-        self.assertEqual(self.run_cli("--staged")[0], 2)
+        code, out, err = self.run_cli("--staged")
+        self.assertEqual((code, out.splitlines()[0], err), (1, "a.ts:1: C1: 2-line prose block (limit 1)", ""))
 
     def test_a_staged_binary_file_that_is_not_utf_8_cannot_be_scanned(self):
         self.write_bytes("a.ts", b"// caf\xe9\x00\n")
         self.git("add", "a.ts")
-        self.assertEqual(self.run_cli("--staged")[0], 2)
+        code, out, err = self.run_cli("--staged")
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("a.ts: could not scan: " + cli.BINARY_NOT_TEXT, err)
 
     def test_nothing_staged_is_clean(self):
         self.write("a.ts", "const a = 1;\n")
@@ -1307,6 +1310,14 @@ class TestSessionHooks(Sandbox):
         self.start()
         self.write("a.ts", "const a = `never closed\n")
         self.assertEqual(self.stop()[0], 2)
+
+    def test_a_text_file_the_session_leaves_not_utf_8_blocks_with_its_own_message(self):
+        self.start()
+        self.write_bytes("b.ts", "// caf\u00e9\nconst b = 1;\n".encode("latin-1"))
+        code, out, err = self.stop()
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("b.ts: could not scan: is not UTF-8 text", err)
+        self.assertNotIn("binary", err)
 
     def test_a_fixed_violation_passes_the_next_stop(self):
         self.start()
