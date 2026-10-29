@@ -29,6 +29,12 @@ class TestComments(unittest.TestCase):
     def test_a_trailing_comment_is_reported(self):
         self.assertEqual(found("a.rb", "x = 1 # see ADR-9\n"), [("C3", 1)])
 
+    def test_a_shebang_is_not_prose(self):
+        self.assertEqual(found("a.rb", "#!/usr/bin/env ruby\n# frozen_string_literal: true\n\nputs 1\n"), [])
+
+    def test_a_shebang_after_the_first_line_is_a_comment(self):
+        self.assertEqual(found("a.rb", "x = 1\n#!/usr/bin/env ruby\n# one\n"), [("C1", 2)])
+
 
 class TestHeredocs(unittest.TestCase):
     def test_heredoc_payload_is_content(self):
@@ -64,6 +70,45 @@ class TestHeredocs(unittest.TestCase):
     def test_an_unterminated_heredoc_cannot_be_lexed(self):
         with self.assertRaises(LexError):
             engine.check_text("a.rb", "s = <<~EOS\nnever closed\n")
+
+    def test_a_singleton_class_opener_is_not_a_heredoc(self):
+        for opener in ("class <<self", "class << self", "class  <<self", "class\t<<self"):
+            text = "class Foo\n  " + opener + "\n    def x; end\n  end\nend\n"
+            self.assertEqual(found("a.rb", text), [], opener)
+
+    def test_the_opener_after_a_bracket_brace_or_operator_is_a_heredoc(self):
+        self.assertEqual(found("a.rb", "find_by_sql([<<~SQL, id])\n  #{a}\n  #{b}\nSQL\n"), [])
+        self.assertEqual(found("a.rb", "x = [<<~SQL, 1]\n  # select see ADR-7\nSQL\n"), [])
+        for opener in ("h = {<<~EOS => 1}", "x = !<<~EOS", "a &&<<~EOS", "a ||<<~EOS", "a = 1;<<~EOS"):
+            self.assertEqual(found("a.rb", opener + "\n# see ADR-7\nEOS\n"), [], opener)
+
+    def test_the_opener_after_a_unary_sign_is_a_heredoc(self):
+        self.assertEqual(found("a.rb", "s = +<<~EOS\n  # one\n  # two\nEOS\n"), [])
+        self.assertEqual(found("a.rb", "s = -<<~EOS\n  # see ADR-7\nEOS\n"), [])
+
+    def test_a_sign_after_a_word_is_not_a_unary_sign(self):
+        self.assertEqual(found("a.rb", "x = a+<<b\n# see ADR-7\n"), [("C3", 2)])
+
+    def test_the_symbol_for_the_append_method_opens_nothing(self):
+        self.assertEqual(found("a.rb", "alias_method :<<, :push\n# see ADR-7\n"), [("C3", 2)])
+        self.assertEqual(found("a.rb", "send(:<<EOS)\n# see ADR-7\n"), [("C3", 2)])
+
+
+class TestDataSection(unittest.TestCase):
+    def test_the_lines_after_end_are_not_source(self):
+        self.assertEqual(found("a.rb", "puts DATA.read\n__END__\n=begin\nfoo\n"), [])
+        self.assertEqual(found("a.rb", "puts DATA.read\n__END__\ncat <<EOF\n"), [])
+        self.assertEqual(found("a.rb", "x = 1\n__END__\n# see ADR-7\n"), [])
+
+    def test_a_crlf_end_line_ends_the_source(self):
+        self.assertEqual(found("a.rb", "x = 1\r\n__END__\r\n# see ADR-7\r\n"), [])
+
+    def test_end_must_fill_its_line(self):
+        self.assertEqual(found("a.rb", "x = 1\n__END__ \n# see ADR-7\n"), [("C3", 3)])
+        self.assertEqual(found("a.rb", "x = 1\n  __END__\n# see ADR-7\n"), [("C3", 3)])
+
+    def test_end_inside_a_heredoc_is_payload(self):
+        self.assertEqual(found("a.rb", "s = <<~EOS\n__END__\nEOS\n# see ADR-7\n"), [("C3", 4)])
 
 
 class TestBeginEnd(unittest.TestCase):

@@ -333,7 +333,6 @@ accident.
 | Makefile | The text after `;` on a rule line is read as make syntax, so quotes do not protect a hash. `.RECIPEPREFIX` is not read, so a recipe behind a custom prefix is make syntax too. | `all: ; echo "# docs/x"` is C3 |
 | Ruby | A `#` in a character literal, a percent literal or a regex literal starts a comment, also the `#{ }` that opens an interpolation in a regex. | `x = ?#docs/prefix`, `%w[a #docs/prefix]` and `/#docs/prefix/ =~ s` are C3 |
 | Ruby | Only the first heredoc opened on a line is followed, and a backtick heredoc is not one. The payload of the others reads as code. | `foo(<<~A, <<~B)` leaves the payload of `B` judged |
-| Ruby | `__END__` is not known to end the source, so the data section after it is read for comments. | `# see ADR-7` after `__END__` is C3 |
 | Ruby | A space before `<<` and a word after it is taken as a heredoc opener, also for an append, and an unterminated one is exit code 2. | `puts x if a <<b` is exit code 2 |
 | Makefile | A comment written inside a `define` block is content, so it is never judged. | `# see ADR-7` between `define` and `endef` is not reported |
 | C# | Lines inside a multi-line verbatim string `@"..."` are judged as code. | `// ...` lines inside one are a C1 block |
