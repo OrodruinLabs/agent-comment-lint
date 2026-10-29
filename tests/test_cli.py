@@ -12,6 +12,7 @@ import unittest
 from unittest import mock
 
 from agent_comment_lint import __version__, cli, gitio, hook, report, session
+from test_agents import fixture
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TWO_BLOCKS = "// one\n// two\nint x;\n// three\n// four\n"
@@ -1257,6 +1258,84 @@ class TestHookAgents(Sandbox):
             stdin = event("Write", "a.ts", content=content)
             self.assertEqual(self.run_cli("--hook", "--agent", "claude", stdin=stdin),
                              self.run_cli("--hook", stdin=stdin))
+
+
+class TestHookCodex(Sandbox):
+    """`--hook --agent codex` on the documented apply_patch event, its patch paths relative to the event's cwd."""
+
+    def run_codex(self, *lines, cwd=None):
+        patch = "\n".join(("*** Begin Patch",) + lines + ("*** End Patch",))
+        stdin = json.dumps(dict(fixture("codex-write"), cwd=cwd or self.tmp, tool_input={"command": patch}))
+        return self.run_cli("--hook", "--agent", "codex", stdin=stdin)
+
+    def test_an_added_file_with_a_two_line_comment_is_blocked(self):
+        code, out, err = self.run_codex("*** Add File: a.ts", "+// one", "+// two")
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("a.ts:1: C1: 2-line prose block (limit 1)", err)
+
+    def test_a_clean_added_file_passes_silently(self):
+        self.assertEqual(self.run_codex("*** Add File: a.ts", "+const a = 1;"), (0, "", ""))
+
+    def test_the_second_file_of_a_patch_is_judged_and_named(self):
+        self.write("a.ts", "const a = 1;\n")
+        code, _out, err = self.run_codex("*** Update File: a.ts", "@@", "-const a = 1;", "+const a = 2;",
+                                         "*** Add File: b.ts", "+// one", "+// two", "+const b = 1;")
+        self.assertEqual(code, 2)
+        self.assertIn("b.ts:1: C1:", err)
+        self.assertNotIn("a.ts", err)
+
+    def test_a_patch_that_only_deletes_is_not_judged(self):
+        self.write("a.ts", "// one\n// two\nconst a = 1;\n")
+        self.assertEqual(self.run_codex("*** Delete File: a.ts"), (0, "", ""))
+
+    def test_a_patch_whose_context_matches_nothing_is_blocked(self):
+        self.write("a.ts", "const a = 1;\n")
+        code, _out, err = self.run_codex("*** Update File: a.ts", "@@", " const z = 9;", "+// one")
+        self.assertEqual(code, 2)
+        self.assertIn("a.ts: could not scan: " + cli.PATCH_NOT_APPLIED, err)
+
+    def test_an_update_is_judged_on_the_lines_it_changes(self):
+        self.write("a.ts", "// old\n// comment\nfunction f() {\n  return 1;\n}\n")
+        self.assertEqual(self.run_codex("*** Update File: a.ts", "@@ function f() {", "-  return 1;", "+  return 2;"),
+                         (0, "", ""))
+        code, _out, err = self.run_codex("*** Update File: a.ts", "@@ function f() {", "+  // one", "+  // two",
+                                         "   return 1;")
+        self.assertEqual(code, 2)
+        self.assertIn("a.ts:4: C1:", err)
+
+    def test_a_move_is_judged_at_its_destination_against_its_source(self):
+        self.write("a.ts", "// old\n// comment\nconst a = 1;\n")
+        moved = ("*** Update File: a.ts", "*** Move to: src/b.ts", "@@", " const a = 1;")
+        self.assertEqual(self.run_codex(*moved + ("+const b = 2;",)), (0, "", ""))
+        code, _out, err = self.run_codex(*moved + ("+// one", "+// two"))
+        self.assertEqual(code, 2)
+        self.assertIn("src/b.ts:4: C1:", err)
+        self.assertNotIn("a.ts:", err)
+
+    def test_a_move_whose_destination_is_out_of_scope_is_not_judged(self):
+        self.write("a.ts", "const a = 1;\n")
+        outside = os.path.join(os.path.dirname(self.tmp), "elsewhere.ts")
+        for destination in ("notes.txt", outside):
+            with self.subTest(destination=destination):
+                self.assertEqual(self.run_codex("*** Update File: a.ts", "*** Move to: " + destination, "@@",
+                                                " const a = 1;", "+// one", "+// two"), (0, "", ""))
+
+    def test_a_move_from_outside_the_root_is_blocked(self):
+        source = os.path.join(os.path.dirname(self.tmp), "outside.ts")
+        code, _out, err = self.run_codex("*** Update File: " + source, "*** Move to: a.ts", "@@", "+const a = 1;")
+        self.assertEqual(code, 2)
+        self.assertIn("a.ts: could not scan: " + cli.MOVED_FROM_OUTSIDE, err)
+
+    def test_patch_paths_are_relative_to_the_event_cwd(self):
+        os.mkdir(os.path.join(self.tmp, "sub"))
+        code, _out, err = self.run_codex("*** Add File: a.ts", "+// one", "+// two", cwd=os.path.join(self.tmp, "sub"))
+        self.assertEqual(code, 2)
+        self.assertIn("sub/a.ts:1: C1:", err)
+
+    def test_a_patch_codex_would_refuse_is_blocked_as_not_the_event(self):
+        code, _out, err = self.run_codex("*** Update File: a.ts")
+        self.assertEqual(code, 2)
+        self.assertIn("standard input is not a Codex hook event: ", err)
 
 
 class TestRunTexts(unittest.TestCase):

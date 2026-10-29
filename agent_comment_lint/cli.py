@@ -21,6 +21,7 @@ DIFF_MISMATCH = "git counts %d added line(s) but its diff shows %d, so the chang
 BINARY_NOT_TEXT = "git shows no changed lines for it (a binary file) and it is not UTF-8 text, so it cannot be judged"
 HOOK_INPUT = "standard input is not a %s hook event: %s"
 PATCH_NOT_APPLIED = "the edit does not apply exactly to the file on disk, so it cannot be judged"
+MOVED_FROM_OUTSIDE = "is moved from a file that resolves outside the repository root, so it cannot be judged"
 HOOK_NOT_UTF8 = "is not UTF-8 text, so the write cannot be judged"
 SESSION_NOT_UTF8 = "is not UTF-8 text, so the lines this session changed cannot be judged"
 STAGED_UNMERGED = "is unmerged, so its staged lines cannot be judged"
@@ -436,11 +437,15 @@ def _judge_target(run, root, cwd, load_config, follow_worktrees, target, title):
     config = load_config(root)
     if settings.excluded(config, relative):
         return
+    source = relative if target.source is None else _relative_to_root(root, cwd, target.source)
+    if source is None:
+        run.errors.append((relative, None, MOVED_FROM_OUTSIDE))
+        return
     run.governance = config.governance
     run.tool = target.tool
     try:
         try:
-            current = _current_text(root, relative)
+            current = _current_text(root, source)
         except UnicodeDecodeError:
             if target.tool != "Write":
                 raise

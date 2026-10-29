@@ -1,0 +1,14 @@
+{
+  "session_id": "thr_123",
+  "transcript_path": "/home/u/.codex/sessions/rollout.jsonl",
+  "cwd": "/repo",
+  "hook_event_name": "PreToolUse",
+  "model": "gpt-5",
+  "permission_mode": "default",
+  "turn_id": "turn_1",
+  "tool_name": "apply_patch",
+  "tool_use_id": "call_2",
+  "tool_input": {
+    "command": "*** Begin Patch\n*** Update File: src/app.py\n@@ def main():\n     name = \"world\"\n-    print(\"hi\")\n+    print(\"hello\", name)\n*** End Patch\n"
+  }
+}

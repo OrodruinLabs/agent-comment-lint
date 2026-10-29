@@ -1,12 +1,17 @@
 """Claude Code's PreToolUse event: the file a write would leave behind, and which of its lines the write touched."""
 import difflib
+import os
 from collections import namedtuple
+
+from . import codex_patch
+from .codex_patch import CodexFile, CodexHunk, apply_hunks as apply_codex_hunks
 
 WRITE_TOOLS = ("Write", "Edit", "MultiEdit")
 
-Target = namedtuple("Target", ["tool", "path", "tool_input", "must_apply"], defaults=[False])
-Target.__doc__ = ("A write the hook judges: the tool's name, the file it writes, the tool's own input, and whether an "
-                  "edit that does not apply to the file on disk is an error.")
+Target = namedtuple("Target", ["tool", "path", "tool_input", "must_apply", "source"], defaults=[False, None])
+Target.__doc__ = ("A write the hook judges: the tool's name, the file it writes, the tool's own input, whether an "
+                  "edit that does not apply to the file on disk is an error, and the file the edit applies to when "
+                  "that is not the one written, as for a move.")
 
 
 class HookInputError(Exception):
@@ -34,8 +39,47 @@ def _claude(event):
     return [] if found is None else [found]
 
 
-ADAPTERS = {"claude": _claude}
-TITLES = {"claude": "Claude Code"}
+def parse_codex_patch(text):
+    """The files a Codex patch adds, updates and deletes; HookInputError for a patch Codex itself refuses."""
+    try:
+        return codex_patch.parse_patch(text)
+    except codex_patch.PatchError as error:
+        raise HookInputError("apply_patch: %s" % error)
+
+
+def _codex_path(cwd, path):
+    """A patch's path as Codex resolves it: a relative one from the session's directory, when the event names one."""
+    return os.path.join(cwd, path) if isinstance(cwd, str) and cwd else path
+
+
+def _codex(event):
+    """Codex's apply_patch: one target per file the patch adds or updates; a deleted file is not judged."""
+    tool = event.get("tool_name")
+    if not isinstance(tool, str):
+        raise HookInputError("no \"tool_name\"")
+    # A patch Codex intercepts from a shell command reaches hooks as Bash, so it is not judged here.
+    if tool != "apply_patch":
+        return []
+    tool_input = event.get("tool_input")
+    command = tool_input.get("command") if isinstance(tool_input, dict) else None
+    if not isinstance(command, str):
+        raise HookInputError("apply_patch with no \"tool_input.command\"")
+    cwd = event.get("cwd")
+    found = []
+    for change in parse_codex_patch(command):
+        path = _codex_path(cwd, change.path)
+        if change.kind == "add":
+            found.append(Target("Write", path, {"file_path": path, "content": change.content}))
+        elif change.kind == "update" and change.move_to is None:
+            found.append(Target("CodexPatch", path, {"file_path": path, "hunks": change.hunks}, True))
+        elif change.kind == "update":
+            found.append(Target("CodexPatch", _codex_path(cwd, change.move_to),
+                                {"file_path": path, "hunks": change.hunks}, True, path))
+    return found
+
+
+ADAPTERS = {"claude": _claude, "codex": _codex}
+TITLES = {"claude": "Claude Code", "codex": "Codex"}
 
 
 def targets(event, agent):
@@ -79,6 +123,8 @@ def proposed_text(target, current):
     tool_input = target.tool_input
     if target.tool == "Write":
         return _string(tool_input.get("content"), "content")
+    if target.tool == "CodexPatch":
+        return None if current is None else apply_codex_hunks(current, tool_input["hunks"])
     edits = [tool_input] if target.tool == "Edit" else tool_input.get("edits")
     if not isinstance(edits, list):
         raise HookInputError("MultiEdit with no \"edits\" list")

@@ -48,3 +48,243 @@ class TestClaudeAdapter(unittest.TestCase):
 class TestRegistry(unittest.TestCase):
     def test_every_adapter_has_a_title_and_no_title_is_orphaned(self):
         self.assertEqual(sorted(hook.TITLES), sorted(hook.ADAPTERS))
+
+
+def at_repo(path):
+    """A patch path as the adapter resolves it against the documented fixtures' session directory, /repo."""
+    return os.path.join("/repo", path)
+
+
+def codex_event(patch, **fields):
+    return dict(fixture("codex-write"), tool_input={"command": patch}, **fields)
+
+
+def patch(*lines):
+    return "\n".join(("*** Begin Patch",) + lines + ("*** End Patch",))
+
+
+def hunk(old, new, anchor=None, at_end=False, context=()):
+    return hook.CodexHunk(anchor, old, new, at_end, context)
+
+
+class TestCodexAdapter(AdapterContract, unittest.TestCase):
+    agent, write_fixture, non_write_fixture, pathless_fixture = "codex", "codex-write", "codex-read", "codex-pathless"
+
+    GREET = 'def greet(name):\n    return "Hello, " + name\n'
+
+    def targets(self, event):
+        return hook.targets(event, "codex")
+
+    def test_an_added_file_is_a_write_of_its_content(self):
+        path = at_repo("src/greet.py")
+        self.assertEqual(self.targets(fixture("codex-write")),
+                         [hook.Target("Write", path, {"file_path": path, "content": self.GREET})])
+
+    def test_an_updated_file_is_a_patch_that_must_apply(self):
+        path = at_repo("src/app.py")
+        found = hunk(['    name = "world"', '    print("hi")'], ['    name = "world"', '    print("hello", name)'],
+                     anchor="def main():", context=((0, 0),))
+        self.assertEqual(self.targets(fixture("codex-edit")),
+                         [hook.Target("CodexPatch", path, {"file_path": path, "hunks": [found]}, True)])
+
+    def test_a_deleted_file_is_not_judged(self):
+        self.assertEqual(self.targets(fixture("codex-delete")), [])
+
+    def test_a_patch_in_a_heredoc_is_read_as_the_bare_patch(self):
+        self.assertEqual(self.targets(fixture("codex-heredoc")), self.targets(fixture("codex-write")))
+
+    def test_a_shell_command_is_not_judged(self):
+        self.assertEqual(self.targets(fixture("codex-read")), [])
+
+    def test_a_moved_file_is_judged_at_its_destination_from_its_source(self):
+        event = codex_event(patch("*** Update File: a.py", "*** Move to: b.py", "@@", "-x", "+y"))
+        source = at_repo("a.py")
+        self.assertEqual(self.targets(event), [hook.Target("CodexPatch", at_repo("b.py"),
+                                                           {"file_path": source, "hunks": [hunk(["x"], ["y"])]},
+                                                           True, source)])
+
+    def test_every_file_of_a_patch_is_a_target_in_order(self):
+        event = codex_event(patch("*** Add File: a.py", "+a", "*** Delete File: b.py", "*** Update File: c.py",
+                                  "@@", "-c", "+d"))
+        self.assertEqual([(found.tool, found.path) for found in self.targets(event)],
+                         [("Write", at_repo("a.py")), ("CodexPatch", at_repo("c.py"))])
+
+    def test_a_relative_path_resolves_against_the_event_cwd_only_when_it_is_a_string(self):
+        for cwd, expected in (("/elsewhere", os.path.join("/elsewhere", "a.py")), ("", "a.py"), (None, "a.py"),
+                              (7, "a.py")):
+            with self.subTest(cwd=cwd):
+                found = self.targets(codex_event(patch("*** Add File: a.py", "+a"), cwd=cwd))
+                self.assertEqual([target.path for target in found], [expected])
+
+    def test_an_absolute_path_is_kept(self):
+        path = os.path.abspath(os.path.join(os.sep, "abs", "a.py"))
+        found = self.targets(codex_event(patch("*** Add File: %s" % path, "+a")))
+        self.assertEqual([target.path for target in found], [path])
+
+    def test_a_patch_codex_would_refuse_is_not_the_event(self):
+        for command in ("", "not a patch", patch("*** Update File: a.py"), 7):
+            with self.subTest(command=command):
+                with self.assertRaises(hook.HookInputError):
+                    self.targets(codex_event(command))
+
+    def test_an_event_with_no_tool_name_is_refused(self):
+        event = fixture("codex-write")
+        del event["tool_name"]
+        with self.assertRaises(hook.HookInputError):
+            self.targets(event)
+
+    def test_a_patch_proposes_its_text_and_nothing_for_a_missing_file(self):
+        target = hook.Target("CodexPatch", "a.py", {"file_path": "a.py", "hunks": [hunk(["x"], ["y"])]}, True)
+        self.assertEqual(hook.proposed_text(target, "x\n"), "y\n")
+        self.assertIsNone(hook.proposed_text(target, None))
+
+
+class TestCodexPatchParser(unittest.TestCase):
+    def parse(self, *lines):
+        return hook.parse_codex_patch(patch(*lines))
+
+    def assert_refused(self, text):
+        with self.assertRaises(hook.HookInputError):
+            hook.parse_codex_patch(text)
+
+    def test_an_added_file_holds_its_plus_lines(self):
+        self.assertEqual(self.parse("*** Add File: a.py", "+one", "+", "+two"),
+                         [hook.CodexFile("add", "a.py", None, "one\n\ntwo\n", None)])
+
+    def test_an_updated_file_holds_its_hunks(self):
+        self.assertEqual(self.parse("*** Update File: a.py", "@@ def f():", " keep", "-old", "+new", "@@", "-x", "+y"),
+                         [hook.CodexFile("update", "a.py", None, None, [
+                             hunk(["keep", "old"], ["keep", "new"], anchor="def f():", context=((0, 0),)),
+                             hunk(["x"], ["y"])])])
+
+    def test_a_deleted_file_has_no_body(self):
+        self.assertEqual(self.parse("*** Delete File: a.py"), [hook.CodexFile("delete", "a.py", None, None, None)])
+
+    def test_a_moved_file_names_its_destination(self):
+        self.assertEqual(self.parse("*** Update File: a.py", "*** Move to: b/c.py", "@@", "-x", "+y"),
+                         [hook.CodexFile("update", "a.py", "b/c.py", None, [hunk(["x"], ["y"])])])
+
+    def test_a_bare_heredoc_around_the_patch_is_dropped(self):
+        for opener in ("<<EOF", "<<'EOF'", '<<"EOF"'):
+            with self.subTest(opener=opener):
+                text = "%s\n%s\nEOF\n" % (opener, patch("*** Delete File: a.py"))
+                self.assertEqual(hook.parse_codex_patch(text), self.parse("*** Delete File: a.py"))
+
+    def test_a_heredoc_that_starts_with_a_command_is_refused(self):
+        self.assert_refused("apply_patch <<'EOF'\n%s\nEOF\n" % patch("*** Delete File: a.py"))
+
+    def test_an_environment_id_after_begin_patch_is_ignored(self):
+        self.assertEqual(self.parse("*** Environment ID: remote", "*** Delete File: a.py"),
+                         self.parse("*** Delete File: a.py"))
+
+    def test_an_environment_id_that_is_empty_repeated_or_late_is_refused(self):
+        for lines in (("*** Environment ID: ", "*** Delete File: a.py"),
+                      ("*** Environment ID: a", "*** Environment ID: b", "*** Delete File: a.py"),
+                      ("*** Delete File: a.py", "*** Environment ID: a")):
+            with self.subTest(lines=lines):
+                self.assert_refused(patch(*lines))
+
+    def test_windows_line_endings_are_tolerated(self):
+        text = patch("*** Update File: a.py", "@@", " keep", "-x", "+y").replace("\n", "\r\n")
+        self.assertEqual(hook.parse_codex_patch(text), self.parse("*** Update File: a.py", "@@", " keep", "-x", "+y"))
+
+    def test_markers_may_carry_surrounding_whitespace(self):
+        text = "\n  *** Begin Patch  \n  *** Add File: a.py  \n+a\n  *** End Patch  \n\n"
+        self.assertEqual(hook.parse_codex_patch(text), [hook.CodexFile("add", "a.py", None, "a\n", None)])
+
+    def test_a_first_chunk_may_omit_its_marker(self):
+        self.assertEqual(self.parse("*** Update File: a.py", " keep", "-x", "+y"),
+                         self.parse("*** Update File: a.py", "@@", " keep", "-x", "+y"))
+
+    def test_an_empty_line_in_an_update_is_empty_context(self):
+        found = hunk(["x", ""], ["", "y"], context=((1, 0),))
+        self.assertEqual(self.parse("*** Update File: a.py", "@@", "-x", "", "+y"),
+                         [hook.CodexFile("update", "a.py", None, None, [found])])
+
+    def test_end_of_file_marks_the_hunk_before_it(self):
+        self.assertEqual(self.parse("*** Update File: a.py", "@@", "-x", "+y", "*** End of File", "", "@@", "+z"),
+                         [hook.CodexFile("update", "a.py", None, None, [hunk(["x"], ["y"], at_end=True),
+                                                                         hunk([], ["z"])])])
+
+    def test_an_empty_patch_has_no_files(self):
+        self.assertEqual(self.parse(), [])
+
+    def test_text_codex_refuses_is_refused(self):
+        for text in ("", "not a patch", "*** Begin Patch\n*** Add File: a.py\n+x",
+                     patch("*** Update File: a.py"),
+                     patch("*** Update File: a.py", "@@", "@@", "-x"),
+                     patch("*** Update File: a.py", "@@"),
+                     patch("*** Update File: a.py", "@@", "*** End of File"),
+                     patch("*** Update File: a.py", "@@", "-x", "*** End of File", " y"),
+                     patch("*** Update File: a.py", "-x", "garbage"),
+                     patch("*** Update File: a.py", "@@", "-x", "*** Move to: b.py"),
+                     patch("*** Add File: a.py", "x"),
+                     patch("*** Delete File: a.py", "+x"),
+                     patch("*** Frobnicate: a.py"),
+                     "*** Begin Patch\n*** End Patch\nmore\n*** End Patch"):
+            with self.subTest(text=text):
+                self.assert_refused(text)
+
+
+class TestCodexHunks(unittest.TestCase):
+    def apply(self, text, *hunks):
+        return hook.apply_codex_hunks(text, list(hunks))
+
+    def test_old_lines_are_replaced_by_new_lines(self):
+        self.assertEqual(self.apply("a\nb\nc\n", hunk(["b"], ["x", "y"])), "a\nx\ny\nc\n")
+
+    def test_an_anchor_moves_the_search_past_it(self):
+        text = "def a():\n    return 1\ndef b():\n    return 1\n"
+        self.assertEqual(self.apply(text, hunk(["    return 1"], ["    return 2"], anchor="def b():")),
+                         "def a():\n    return 1\ndef b():\n    return 2\n")
+
+    def test_an_anchor_that_is_not_found_does_not_apply(self):
+        self.assertIsNone(self.apply("a\n", hunk(["a"], ["b"], anchor="def c():")))
+
+    def test_an_exact_match_wins_over_one_that_ignores_whitespace(self):
+        self.assertEqual(self.apply("x \nx\n", hunk(["x"], ["y"])), "x \ny\n")
+
+    def test_trailing_whitespace_is_ignored_before_leading_whitespace(self):
+        self.assertEqual(self.apply("  x\nx  \n", hunk(["x"], ["y"])), "  x\ny\n")
+
+    def test_leading_whitespace_is_ignored_last_of_the_three(self):
+        self.assertEqual(self.apply("a\n  x\n", hunk(["x"], ["y"])), "a\ny\n")
+
+    def test_unicode_punctuation_matches_its_ascii_form_last(self):
+        text = "a \u2013 \u201cb\u201d\u00a0\u2019c\u2019\n"
+        self.assertEqual(self.apply(text, hunk(["a - \"b\" 'c'"], ["d"])), "d\n")
+
+    def test_a_context_line_keeps_the_text_of_the_file(self):
+        self.assertEqual(self.apply("    keep  \nold\n", hunk(["keep", "old"], ["keep", "new"], context=((0, 0),))),
+                         "    keep  \nnew\n")
+
+    def test_an_end_of_file_hunk_matches_at_the_end(self):
+        self.assertEqual(self.apply("x\ny\nx\n", hunk(["x"], ["z"], at_end=True)), "x\ny\nz\n")
+        self.assertEqual(self.apply("x\ny\nx\n", hunk(["x"], ["z"])), "z\ny\nx\n")
+
+    def test_an_end_of_file_hunk_that_is_not_at_the_end_does_not_apply(self):
+        self.assertIsNone(self.apply("x\ny\n", hunk(["x"], ["z"], at_end=True)))
+
+    def test_a_trailing_empty_old_line_is_retried_without_it(self):
+        self.assertEqual(self.apply("a\n", hunk(["a", ""], ["b", ""])), "b\n")
+
+    def test_a_hunk_with_no_old_lines_is_appended_at_the_end(self):
+        self.assertEqual(self.apply("a\nb\n", hunk([], ["c"], anchor="a")), "a\nb\nc\n")
+
+    def test_hunks_apply_in_order_each_after_the_last(self):
+        self.assertEqual(self.apply("a\nb\na\n", hunk(["a"], ["x"]), hunk(["a"], ["y"])), "x\nb\ny\n")
+
+    def test_a_hunk_before_the_last_match_does_not_apply(self):
+        self.assertIsNone(self.apply("a\nb\n", hunk(["b"], ["y"]), hunk(["a"], ["x"])))
+
+    def test_old_lines_that_match_nothing_do_not_apply(self):
+        self.assertIsNone(self.apply("a\nb\n", hunk(["c"], ["d"])))
+
+    def test_old_lines_longer_than_the_file_do_not_apply(self):
+        self.assertIsNone(self.apply("a\n", hunk(["a", "b"], ["c"])))
+
+    def test_the_file_keeps_its_line_endings_and_new_lines_take_the_first(self):
+        self.assertEqual(self.apply("a\r\nb\nc\r", hunk(["a"], ["x", "y"])), "x\r\ny\r\nb\nc\r")
+
+    def test_every_line_ends_with_a_newline_afterwards(self):
+        self.assertEqual(self.apply("a\nb", hunk(["a"], ["x"])), "x\nb\n")

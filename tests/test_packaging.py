@@ -9,6 +9,7 @@ import tempfile
 import unittest
 
 from agent_comment_lint import __version__, governance
+from test_agents import fixture
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WRAPPER = os.path.join(REPO, "hooks", "agent-comment-lint-hook.sh")
@@ -401,3 +402,64 @@ class TestCapture(unittest.TestCase):
             done = self.run_capture(b"{}", capture)
             self.assertEqual(done.returncode, 0)
             self.assertIn(b"AGENT_COMMENT_LINT_CAPTURE", done.stderr)
+
+
+CODEX_HOOKS = os.path.join(REPO, "integrations", "codex", "hooks.json")
+
+
+class TestCodexTemplate(unittest.TestCase):
+    """The Codex template installed as `.codex/hooks.json` with the guards beside it, run the way Codex runs a hook."""
+
+    def handler(self):
+        groups = load("integrations", "codex", "hooks.json")["hooks"]["PreToolUse"]
+        self.assertEqual([group["matcher"] for group in groups], ["^apply_patch$"])
+        (handler,) = groups[0]["hooks"]
+        return handler
+
+    def test_both_commands_run_the_guard_for_codex(self):
+        handler = self.handler()
+        self.assertEqual(handler["type"], "command")
+        self.assertNotIn("async", handler)
+        self.assertIn('/.codex/agent-comment-lint-guard.sh" codex', handler["command"])
+        self.assertIn('/.codex/agent-comment-lint-guard.cmd" codex', handler["commandWindows"])
+
+    def run_hook(self, patch, guards=(".sh", ".cmd")):
+        """Codex runs `$SHELL -lc command`, or `%COMSPEC% /C "commandWindows"`, in the session's directory."""
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = os.path.join(os.path.realpath(tmp), "repo")
+            session = os.path.join(repo, "src")
+            os.makedirs(os.path.join(repo, ".codex"))
+            os.mkdir(session)
+            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            shutil.copy(CODEX_HOOKS, os.path.join(repo, ".codex"))
+            for suffix in guards:
+                shutil.copy(GUARD + suffix, os.path.join(repo, ".codex"))
+            bin_dir = os.path.join(tmp, "bin")
+            os.mkdir(bin_dir)
+            arguments = "%*" if os.name == "nt" else '"$@"'
+            fake_command(bin_dir, '"%s" -m agent_comment_lint %s' % (sys.executable, arguments))
+            env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ["PATH"], PYTHONPATH=REPO)
+            event = dict(fixture("codex-write"), cwd=session, tool_input={"command": patch})
+            if os.name == "nt":
+                command = 'cmd /C "%s"' % self.handler()["commandWindows"]
+            else:
+                command = [SHELL, "-c", self.handler()["command"]]
+            return subprocess.run(command, input=json.dumps(event).encode("utf-8"), cwd=session, env=env,
+                                  capture_output=True)
+
+    @unittest.skipUnless(SHELL, "no POSIX shell on PATH")
+    def test_a_patch_adding_a_two_line_comment_is_blocked_from_a_subdirectory(self):
+        done = self.run_hook("*** Begin Patch\n*** Add File: dirty.ts\n+// one\n+// two\n*** End Patch")
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn(b"src/dirty.ts:1: C1: 2-line prose block (limit 1)", done.stderr)
+
+    @unittest.skipUnless(SHELL, "no POSIX shell on PATH")
+    def test_a_clean_patch_passes_silently(self):
+        done = self.run_hook("*** Begin Patch\n*** Add File: clean.ts\n+const a = 1;\n*** End Patch")
+        self.assertEqual((done.returncode, done.stdout, done.stderr), (0, b"", b""))
+
+    @unittest.skipUnless(SHELL, "no POSIX shell on PATH")
+    def test_a_missing_guard_is_blocked_with_two_and_a_reason(self):
+        done = self.run_hook("*** Begin Patch\n*** Add File: clean.ts\n+const a = 1;\n*** End Patch", guards=())
+        self.assertEqual(done.returncode, 2)
+        self.assertNotEqual(done.stderr.strip(), b"")
