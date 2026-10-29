@@ -44,20 +44,24 @@ The numbers skip because C2, C4 and C6 need a compiler or human judgment, and th
 <div align="center">
 <table>
   <tr>
-    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/csharp/csharp-original.svg" width="32" height="32" alt=""><br><sub>C#</sub></td>
-    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/javascript/javascript-original.svg" width="32" height="32" alt=""><br><sub>JavaScript</sub></td>
-    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/typescript/typescript-original.svg" width="32" height="32" alt=""><br><sub>TypeScript</sub></td>
-    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/css3/css3-original.svg" width="32" height="32" alt=""><br><sub>CSS</sub></td>
-    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/bash/bash-original.svg" width="32" height="32" alt=""><br><sub>Shell</sub></td>
-    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/yaml/yaml-original.svg" width="32" height="32" alt=""><br><sub>YAML</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/csharp/csharp-original.svg" width="32" height="32" alt=""><br><sub>C#</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/javascript/javascript-original.svg" width="32" height="32" alt=""><br><sub>JavaScript</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/typescript/typescript-original.svg" width="32" height="32" alt=""><br><sub>TypeScript</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/css3/css3-original.svg" width="32" height="32" alt=""><br><sub>CSS</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/bash/bash-original.svg" width="32" height="32" alt=""><br><sub>Shell</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/yaml/yaml-original.svg" width="32" height="32" alt=""><br><sub>YAML</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/terraform/terraform-original.svg" width="32" height="32" alt=""><br><sub>Terraform / HCL</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/python/python-original.svg" width="32" height="32" alt=""><br><sub>Python</sub></td>
   </tr>
   <tr>
-    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/terraform/terraform-original.svg" width="32" height="32" alt=""><br><sub>Terraform / HCL</sub></td>
-    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/python/python-original.svg" width="32" height="32" alt=""><br><sub>Python</sub></td>
-    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/ruby/ruby-original.svg" width="32" height="32" alt=""><br><sub>Ruby</sub></td>
-    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/OrodruinLabs/agent-comment-lint@b0946286fae704dde9abb4a318e1e57c403f5f7f/docs/icons/toml.svg" width="32" height="32" alt=""><br><sub>TOML</sub></td>
-    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/docker/docker-original.svg" width="32" height="32" alt=""><br><sub>Dockerfile</sub></td>
-    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/OrodruinLabs/agent-comment-lint@b0946286fae704dde9abb4a318e1e57c403f5f7f/docs/icons/gnu.svg" width="32" height="32" alt=""><br><sub>Makefile</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/ruby/ruby-original.svg" width="32" height="32" alt=""><br><sub>Ruby</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/OrodruinLabs/agent-comment-lint@b0946286fae704dde9abb4a318e1e57c403f5f7f/docs/icons/toml.svg" width="32" height="32" alt=""><br><sub>TOML</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/docker/docker-original.svg" width="32" height="32" alt=""><br><sub>Dockerfile</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/OrodruinLabs/agent-comment-lint@b0946286fae704dde9abb4a318e1e57c403f5f7f/docs/icons/gnu.svg" width="32" height="32" alt=""><br><sub>Makefile</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/go/go-original.svg" width="32" height="32" alt=""><br><sub>Go</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/java/java-original.svg" width="32" height="32" alt=""><br><sub>Java</sub></td>
+    <td align="center" width="12%"><img src="https://cdn.jsdelivr.net/gh/OrodruinLabs/agent-comment-lint@658ab6fd27c2085d6b46ea4fcfe59422a779cd53/docs/icons/rust.svg" width="32" height="32" alt=""><br><sub>Rust</sub></td>
+    <td></td>
   </tr>
 </table>
 </div>
@@ -91,7 +95,7 @@ The details for each agent are in [the reference](https://github.com/OrodruinLab
 
 ## Setup
 
-Pick where it runs; every channel runs the same check. The snippets pin `v1.5.0`. Keep a pin, so a new release never
+Pick where it runs; every channel runs the same check. The snippets pin `v1.6.0`. Keep a pin, so a new release never
 changes your results without a commit of yours.
 
 ### Claude Code
@@ -109,7 +113,7 @@ through Bash, on the lines changed since the session started and not yet committ
 ### Other coding agents
 
 For Codex CLI, Windsurf / Devin and Gemini CLI, install the command as under [Command line](#command-line), then copy
-the agent's template from `integrations/` and the guard scripts at the `v1.5.0` tag. The steps for each agent are in
+the agent's template from `integrations/` and the guard scripts at the `v1.6.0` tag. The steps for each agent are in
 [the reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#other-coding-agents).
 
 ### GitHub Actions
@@ -123,7 +127,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: OrodruinLabs/agent-comment-lint@v1.5.0
+      - uses: OrodruinLabs/agent-comment-lint@v1.6.0
 ```
 
 Only the lines the pull request changes are checked. Keep `fetch-depth: 0`, or the step cannot see what changed and
@@ -135,7 +139,7 @@ lists them all. The inputs are in [the reference](https://github.com/OrodruinLab
 ```yaml
 repos:
   - repo: https://github.com/OrodruinLabs/agent-comment-lint
-    rev: v1.5.0
+    rev: v1.6.0
     hooks:
       - id: agent-comment-lint-staged
 ```
@@ -149,15 +153,15 @@ staged, so it judges nothing. In CI, use the GitHub Action (or `--diff`), or the
 ### Command line
 
 ```
-uv tool install agent-comment-lint==1.5.0
-pipx install agent-comment-lint==1.5.0
+uv tool install agent-comment-lint==1.6.0
+pipx install agent-comment-lint==1.6.0
 ```
 
 To install from the repository instead:
 
 ```
-uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.5.0
-pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.5.0
+uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.6.0
+pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.6.0
 ```
 
 `uvx agent-comment-lint` runs it without installing, which suits CI and trials.
@@ -188,7 +192,7 @@ are no limits to change and no way to silence one comment inline. Every entry st
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.5.0/schema/agent-comment-lint.schema.json",
+  "$schema": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.6.0/schema/agent-comment-lint.schema.json",
   "exclude": [{ "path": "vendor/", "reason": "third-party code" }],
   "governance": {
     "packs": ["azure-boards"],

@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.5.0/schema/agent-comment-lint.schema.json",
+  "$id": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.6.0/schema/agent-comment-lint.schema.json",
   "title": "agent-comment-lint settings",
   "description": "The .agent-comment-lint.json file at a repository root. Settings can exclude paths and add governance references; they cannot relax a rule.",
   "type": "object",

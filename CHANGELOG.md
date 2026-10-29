@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.6.0
+
+- Three more languages are read: Go (`.go`), Java (`.java`) and Rust (`.rs`). Go keeps backtick raw strings and runes
+  as content and treats directives such as `//go:build` and `//nolint:x` as code, judging a `// reason` after one as a
+  trailing comment. Java reads text blocks. Rust nests block comments and reads raw, byte and C strings, and tells
+  lifetimes and labels from character literals. A block comment, string or raw string that never closes is exit code 2.
+- Multi-line doc comments (Javadoc, Rust `///` and `//!`, Go package comments) are C1 blocks in these files, as
+  docstrings and JSDoc are.
+- Both `.pre-commit-hooks.yaml` ids match the new files.
+- Findings move only for files of these languages, which were skipped before. Nothing moves for any other file.
+- The language icons in the README now render on PyPI.
+
 ## 1.5.0
 
 - Four more languages are read: Ruby (`.rb`, `.rake`, `.gemspec`, and the names `Gemfile` and `Rakefile`), TOML
