@@ -3,10 +3,13 @@
 ## 1.3.0
 
 - End-of-session check: a new check at Stop, in the plugin only. A snapshot taken at session start lets it judge only
-  the uncommitted lines changed since the session started, so a checkout, pull or reset during the session brings in
-  no old line, and lines the session commits are left to pre-commit and CI. Known limits: edits a human makes during
-  the session, a session resumed days later, two sessions in one checkout, generated files a build changes, and a
-  merge stopped on a conflict. No finding in any other mode moves.
+  the uncommitted lines changed since the session started, so switching branches, pulls, rebases and resets during
+  the session bring in no old line, nor does a merge, rebase or cherry-pick stopped on a conflict. Lines the session
+  commits are left to pre-commit and CI. Known limits: edits a human makes during the session, a session resumed
+  days later, two sessions in one checkout, generated files a build changes, and lines brought in uncommitted by
+  `git checkout <rev> -- <path>`, `git restore --source`, `git merge --squash`, `git cherry-pick -n`,
+  `git stash pop`, or by `git am` or `git revert` stopped on a conflict or `git revert -n`. No finding in any other
+  mode moves.
 - `--staged` and `agent-comment-lint-staged`: `--staged` judges only the lines staged for the next commit, read from
   the index, so a partly staged file is judged as it will be committed. The new pre-commit id
   `agent-comment-lint-staged` runs it. The existing `agent-comment-lint` id is unchanged, so no verdict moves.

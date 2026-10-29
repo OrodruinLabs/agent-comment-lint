@@ -1615,6 +1615,19 @@ class TestSessionHooksAgainstHead(Sandbox):
         self.stopped_on_a_conflict("rebase", main)
         self.assertEqual(self.hook("Stop"), (0, "", ""))
 
+    def test_a_merge_with_no_commit_brings_in_no_old_line(self):
+        self.write("a.md", "base\n")
+        self.commit("notes")
+        self.git("checkout", "-q", "-b", "other")
+        self.write("old.ts", self.OLD)
+        self.commit("an old comment")
+        self.git("checkout", "-q", "-")
+        self.write("a.md", "mine\n")
+        self.commit("my notes")
+        self.start()
+        self.git("merge", "-q", "--no-commit", "other")
+        self.assertEqual(self.hook("Stop"), (0, "", ""))
+
     def test_a_line_the_session_writes_mid_merge_still_blocks(self):
         self.conflicting_branch()
         self.start()

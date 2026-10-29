@@ -352,23 +352,26 @@ Claude stops. A `SessionStart` entry records a snapshot of the working tree, and
 since. Both run the same wrapper and `--hook`, which dispatches on the event's `hook_event_name`.
 
 - What is judged: lines changed since the session started and not yet committed. A line counts only where it differs
-  both from the snapshot and from HEAD, so a checkout, pull, rebase or reset during the session brings in no old
-  line. A file created during the session and absent from HEAD is judged whole. A file the session never touched is
-  never read, so an old comment or a broken file the session left alone cannot block. Lines the session commits are
-  left to pre-commit (the `agent-comment-lint-staged` id) and CI. Before the first commit, every line changed since
-  the snapshot counts.
+  both from the snapshot and from HEAD, so switching branches, pulls, rebases and resets during the session bring in
+  no old line. While a merge, rebase or cherry-pick is stopped on a conflict, or a merge is held by `--no-commit`, a
+  line must also differ from the commit being brought in (`MERGE_HEAD`, `REBASE_HEAD` or `CHERRY_PICK_HEAD`), so the
+  other side's lines are not judged either. A file created during the session and absent from HEAD is judged whole.
+  A file unchanged since the snapshot is never read, so an old comment or a broken file in it cannot block. Lines
+  the session commits are left to pre-commit (the `agent-comment-lint-staged` id) and CI. Before the first commit,
+  every line changed since the snapshot counts.
 - A file that changed during the session and cannot be scanned blocks, as exit code 2. So does one that is not
   UTF-8 text, as at write time.
 - On findings the hook exits 2 with the same teaching report, opening "Before you finish:", and Claude keeps working.
 - The snapshot is a git tree built from a temporary index. It writes no ref, no index and nothing in the working
   tree, only git objects and a file under `git rev-parse --git-path agent-comment-lint/sessions`. Files older than
-  seven days there are removed. A merge or rebase stopped on a conflict does not stop it: a covered file is taken
-  from disk, and an unmerged file the policy does not cover is left out.
+  seven days there are removed. The snapshot and the check both run while a merge, rebase or cherry-pick is stopped
+  on a conflict: a covered file is read from disk as it stands, and an unmerged file the policy does not cover is
+  left out of the tree.
 - No snapshot means no check. The session ends normally when the plugin was installed mid-session, taking the snapshot
   failed, the directory is not a git work tree, git refuses to read the repository, or the snapshot's objects were
   pruned (`git gc --prune=now`). The snapshot is the first one recorded for the session id, so a resumed or compacted
-  session with none gets one at that moment, and the check covers changes from then on. Once a snapshot is found, a
-  git failure at stop blocks.
+  session with none gets one at that moment, and the check covers changes from then on. A pruned snapshot is not
+  replaced until its file is deleted. Once a snapshot is found, a git failure at stop blocks.
 - How to reset: delete `$(git rev-parse --git-path agent-comment-lint/sessions)/<session id>`, or start a new session.
 - Known limits:
   - Edits a human makes during the session count as the session's own until they are committed.
@@ -376,8 +379,10 @@ since. Both run the same wrapper and `--hook`, which dispatches on the event's `
     uncommitted since it first started counts.
   - Two sessions in one checkout each judge what the other changes while both are open.
   - Generated files a build changes during the session are judged. Exclude them in the committed settings.
-  - A merge, rebase or cherry-pick stopped on a conflict leaves the other side's lines uncommitted, so they are judged
-    until it is committed.
+  - Some git commands bring in another commit's lines uncommitted and leave no head the check can compare them
+    against, so those lines are judged until they are committed: `git checkout <rev> -- <path>`,
+    `git restore --source`, `git merge --squash`, `git cherry-pick -n`, `git stash pop`, `git am` stopped on a
+    conflict, and `git revert` stopped on a conflict or run with `-n`.
   - Only the project directory's own working tree is covered, not sibling worktrees.
 - Claude Code caps forced continuations at 8 in a row, and nothing here tries to get around that.
 
