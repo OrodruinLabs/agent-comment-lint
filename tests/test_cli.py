@@ -1312,6 +1312,21 @@ class TestHookCodex(Sandbox):
         self.assertIn("src/b.ts:4: C1:", err)
         self.assertNotIn("a.ts:", err)
 
+    def test_a_move_from_a_file_the_policy_never_judges_judges_every_line(self):
+        self.write(".agent-comment-lint.json", '{"exclude": [{"path": "gen/", "reason": "generated"}]}')
+        for source in ("notes.txt", "node_modules/a.py", "gen/a.py"):
+            with self.subTest(source=source):
+                self.write(source, "# one\n# two\n# three\nx = 1\n")
+                code, _out, err = self.run_codex("*** Update File: " + source, "*** Move to: moved.py", "@@",
+                                                 "-x = 1", "+x = 2")
+                self.assertEqual(code, 2)
+                self.assertIn("moved.py:1: C1: 3-line prose block (limit 1)", err)
+
+    def test_a_move_from_a_judged_file_judges_only_the_lines_it_changes(self):
+        self.write("a.py", "# one\n# two\n# three\nx = 1\n")
+        self.assertEqual(self.run_codex("*** Update File: a.py", "*** Move to: moved.py", "@@", "-x = 1", "+x = 2"),
+                         (0, "", ""))
+
     def test_a_move_whose_destination_is_out_of_scope_is_not_judged(self):
         self.write("a.ts", "const a = 1;\n")
         outside = os.path.join(os.path.dirname(self.tmp), "elsewhere.ts")

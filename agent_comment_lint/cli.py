@@ -463,7 +463,9 @@ def _judge_target(run, root, cwd, load_config, follow_worktrees, target, title):
         if target.must_apply:
             run.errors.append((relative, None, PATCH_NOT_APPLIED))
         return
-    run.judge(relative, after, hook.changed_ranges(current, after))
+    # A source the policy never judges holds no judged line, so a move from it brings in every line as new.
+    before = current if _judged(config, source) else None
+    run.judge(relative, after, hook.changed_ranges(before, after))
 
 
 def _execute(args, cwd, stdin):
