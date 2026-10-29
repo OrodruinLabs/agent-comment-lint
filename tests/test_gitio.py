@@ -151,6 +151,37 @@ class TestRepository(unittest.TestCase):
             with self.assertRaises(gitio.GitError):
                 gitio.snapshot_tree(self.tmp, ["a.ts"])
 
+    def commit_both(self, text):
+        self.write("a.md", text)
+        self.write("b.ts", text)
+        self.commit()
+
+    def conflicted(self):
+        """A merge stopped on conflicts in `a.md` and `b.ts`, with the working tree's `b.ts` then resolved."""
+        os.mkdir(os.path.join(self.tmp, "sub"))
+        self.write("sub/c.ts", b"const c = 1;\n")
+        self.commit_both(b"base\n")
+        self.git("checkout", "-q", "-b", "other")
+        self.commit_both(b"other\n")
+        self.git("checkout", "-q", "-")
+        self.commit_both(b"mine\n")
+        subprocess.run(["git", "merge", "-q", "other"], cwd=self.tmp, capture_output=True)
+        self.write("b.ts", b"resolved\n")
+        self.assertIn("a.md", self.git("ls-files", "-u"))
+
+    def test_a_snapshot_mid_merge_takes_covered_paths_from_disk_and_leaves_the_real_index_alone(self):
+        self.conflicted()
+        tree = gitio.snapshot_tree(self.tmp, ["b.ts"])
+        self.assertEqual(gitio.blob(self.tmp, tree + ":b.ts"), b"resolved\n")
+        self.assertIn("a.md", self.git("ls-files", "-u"))
+
+    def test_a_snapshot_in_a_subdirectory_mid_merge_is_not_stopped_by_conflicts_above_it(self):
+        self.conflicted()
+        sub = os.path.join(self.tmp, "sub")
+        self.write("sub/c.ts", b"const c = 2;\n")
+        tree = gitio.snapshot_tree(sub, ["c.ts"])
+        self.assertEqual(gitio.blob(sub, tree + ":./c.ts"), b"const c = 2;\n")
+
     def test_has_object_is_false_only_for_an_object_the_repository_lacks(self):
         self.write("a.ts", b"one\n")
         self.assertTrue(gitio.has_object(self.tmp, gitio.snapshot_tree(self.tmp, ["a.ts"])))

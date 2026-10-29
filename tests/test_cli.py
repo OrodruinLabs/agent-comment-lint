@@ -1469,6 +1469,20 @@ class TestSessionHooksAgainstHead(Sandbox):
         self.commit("the session commits its own violation")
         self.assertEqual(self.hook("Stop"), (0, "", ""))
 
+    def test_a_merge_conflict_in_a_file_the_policy_does_not_cover_does_not_block(self):
+        self.write("a.md", "base\n")
+        self.commit("notes")
+        self.git("checkout", "-q", "-b", "other")
+        self.write("a.md", "other\n")
+        self.commit("their notes")
+        self.git("checkout", "-q", "-")
+        self.write("a.md", "mine\n")
+        self.commit("my notes")
+        self.start()
+        subprocess.run(("git", "merge", "-q", "other"), cwd=self.tmp, capture_output=True)
+        self.assertIn("a.md", self.git("ls-files", "-u").stdout)
+        self.assertEqual(self.hook("Stop"), (0, "", ""))
+
     def test_a_line_the_session_reverts_to_its_committed_text_is_not_judged(self):
         self.write("a.ts", "// one\n// two\nconst a = 1;\n")
         self.commit("an old block")

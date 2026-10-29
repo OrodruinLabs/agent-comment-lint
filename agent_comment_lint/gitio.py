@@ -149,7 +149,7 @@ def git_path(root, name):
 
 
 def snapshot_tree(root, paths):
-    """A tree of the whole repository with `paths` (relative to `root`) as on disk; read entries as `tree:./path`."""
+    """A tree of the whole repository with `paths` (relative to `root`) as on disk, less any other unmerged path."""
     try:
         handle, scratch = tempfile.mkstemp(prefix="agent-comment-lint-index-")
         os.close(handle)
@@ -168,6 +168,12 @@ def snapshot_tree(root, paths):
         env = {"GIT_INDEX_FILE": scratch}
         listing = "".join(path + "\0" for path in paths).encode("utf-8")
         _git_bytes(root, "update-index", "--add", "--remove", "-z", "--stdin", env=env, input=listing)
+        # Write-tree refuses a conflict mid-merge; a path still unmerged here is one the policy does not cover.
+        unmerged = _git_bytes(root, "ls-files", "-u", "-z", "--", ":/", env=env).split(b"\0")
+        names = dict.fromkeys(record.split(b"\t", 1)[1] for record in unmerged if record)
+        if names:
+            _git_bytes(root, "update-index", "--force-remove", "-z", "--stdin", env=env,
+                       input=b"".join(name + b"\0" for name in names))
         return _git_bytes(root, "write-tree", env=env).decode("ascii").strip()
     finally:
         try:
