@@ -15,6 +15,8 @@ WRAPPER = os.path.join(REPO, "hooks", "agent-comment-lint-hook.sh")
 DIRTY = json.dumps({"tool_name": "Write", "tool_input": {"file_path": "x.ts", "content": "// one\n// two\n"}})
 CLEAN = json.dumps({"tool_name": "Write", "tool_input": {"file_path": "x.ts", "content": "const a = 1;\n"}})
 SHELL = shutil.which("sh") or shutil.which("bash")
+# On Windows the first `bash` on PATH is often the WSL launcher, so the bash beside Git's `sh` is the one Actions runs.
+BASH = os.path.join(os.path.dirname(SHELL), "bash.exe") if os.name == "nt" and SHELL else shutil.which("bash")
 
 
 def load(*parts):
@@ -163,10 +165,10 @@ class TestAction(unittest.TestCase):
     def run_action(self, repo, summary, base):
         env = dict(os.environ, GITHUB_ACTION_PATH=REPO, GITHUB_STEP_SUMMARY=summary, MODE="diff", BASE=base,
                    ARGS="", TARGET="")
-        command = ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", self.action_block()]
+        command = [BASH, "--noprofile", "--norc", "-eo", "pipefail", "-c", self.action_block()]
         return subprocess.run(command, cwd=repo, env=env, capture_output=True, text=True, encoding="utf-8")
 
-    @unittest.skipUnless(shutil.which("bash") and shutil.which("git"), "needs bash and git")
+    @unittest.skipUnless(BASH and os.path.isfile(BASH) and shutil.which("git"), "needs bash and git")
     def test_the_action_prints_findings_and_removes_the_matcher_under_bash_e(self):
         with tempfile.TemporaryDirectory() as tmp:
             repo = os.path.join(tmp, "repo")

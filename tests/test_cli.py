@@ -61,6 +61,8 @@ class Sandbox(unittest.TestCase):
 
     def make_executable(self, name):
         os.chmod(os.path.join(self.tmp, name), 0o755)
+        # Git on Windows ignores the executable bit on disk, so the mode change is recorded in the index directly.
+        self.git("update-index", "--chmod=+x", name)
 
 
 class TestUsage(Sandbox):
@@ -178,11 +180,12 @@ class TestFilesMode(Sandbox):
     def test_the_file_system_root_is_a_root_like_any_other(self):
         self.write("src/Dirty.cs", "// see ADR-0001\n")
         named = os.path.join(self.tmp, "src", "Dirty.cs")
+        top = os.path.splitdrive(self.tmp)[0] + os.sep
         for mode in (["--files", named], ["--stdin-path", named]):
             code, out, err = self.run_cli(*mode, "--root", os.sep, stdin="// see ADR-0001\n")
             self.assertEqual((code, err), (1, ""), mode)
             self.assertEqual(out.splitlines()[0], "%s:1: C3: governance reference 'ADR-0001'"
-                             % os.path.relpath(named, os.sep).replace(os.sep, "/"), mode)
+                             % os.path.relpath(named, top).replace(os.sep, "/"), mode)
 
 
 class TestAllMode(Sandbox):
@@ -1002,8 +1005,13 @@ class TestHookMode(Sandbox):
     def test_a_path_with_a_nul_byte_blocks(self):
         self.assert_blocked(self.hook(event("Write", "a\x00.ts", content="x\n")))
 
+    @unittest.skipIf(os.name == "nt", "a Windows file name may hold a lone surrogate")
     def test_a_path_with_a_lone_surrogate_blocks(self):
         self.assert_blocked(self.hook(event("Write", "a\ud800.ts", content="x\n")))
+
+    @unittest.skipUnless(os.name == "nt", "a Windows file name may hold a lone surrogate")
+    def test_a_path_with_a_lone_surrogate_is_judged_like_any_other(self):
+        self.assert_blocked(self.hook(event("Write", "a\ud800.ts", content="// one\n// two\n")), ":1: C1:")
 
     def test_deeply_nested_input_blocks(self):
         self.assert_blocked(self.hook("[" * 200000))
