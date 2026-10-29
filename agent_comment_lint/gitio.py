@@ -162,7 +162,8 @@ def snapshot_tree(root, paths):
         real = git_path(root, "index")
         try:
             if os.path.exists(real):
-                shutil.copyfile(real, scratch)
+                # Git judges a file racily clean against the index's own mtime, so the copy must keep it.
+                shutil.copy2(real, scratch)
             else:
                 # Git refuses an existing empty file as an index.
                 os.remove(scratch)

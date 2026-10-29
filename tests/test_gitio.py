@@ -85,6 +85,19 @@ class TestRepository(unittest.TestCase):
         self.assertEqual(gitio.blob(self.tmp, tree + ":a.ts"), b"one\ntwo\n")
         self.assertEqual(gitio.blob(self.tmp, tree + ":b.ts"), b"new\n")
 
+    def test_a_same_size_edit_in_the_index_s_own_second_is_still_seen(self):
+        self.git("config", "core.trustctime", "false")
+        path = os.path.join(self.tmp, "a.ts")
+        past = 1_000_000_000
+        self.write("a.ts", b"one\n")
+        os.utime(path, (past, past))
+        self.commit()
+        self.write("a.ts", b"two\n")
+        os.utime(path, (past, past))
+        os.utime(os.path.join(self.tmp, ".git", "index"), (past, past))
+        tree = gitio.snapshot_tree(self.tmp, ["a.ts"])
+        self.assertEqual(gitio.blob(self.tmp, tree + ":a.ts"), b"two\n")
+
     def test_a_snapshot_leaves_the_real_index_untouched(self):
         self.write("a.ts", b"one\n")
         self.commit()
@@ -150,7 +163,7 @@ class TestRepository(unittest.TestCase):
     def test_a_temporary_index_that_cannot_be_made_is_a_git_error(self):
         self.write("a.ts", b"one\n")
         self.commit()
-        with mock.patch.object(shutil, "copyfile", side_effect=OSError(28, "No space left on device")):
+        with mock.patch.object(shutil, "copy2", side_effect=OSError(28, "No space left on device")):
             with self.assertRaises(gitio.GitError):
                 gitio.snapshot_tree(self.tmp, ["a.ts"])
 
