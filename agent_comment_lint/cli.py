@@ -6,7 +6,7 @@ import sys
 
 from . import __version__
 from . import config as settings
-from . import engine, gitio, hook, report
+from . import engine, gitio, hook, report, session
 from .diff import parse_diff_ranges
 from .lexers import EXTENSIONS, LexError
 
@@ -23,6 +23,10 @@ HOOK_INPUT = "standard input is not a Claude Code PreToolUse event: %s"
 HOOK_NOT_UTF8 = "is not UTF-8 text, so the write cannot be judged"
 HOOK_BLOCKED = "Blocked: agent-comment-lint rejects this write.\n"
 HOOK_HEADER = HOOK_BLOCKED + report.HOOK_SCOPE
+HOOK_STOP_HEADER = ("Before you finish: agent-comment-lint found comments this session added that break the policy.\n"
+                    "Only lines changed since this session started are judged.\n")
+STOP_CLOSING = ("Fix these comments before you finish; the check runs again when you stop.",
+                report.HOOK_CLOSING[1], report.HOOK_CLOSING[2])
 
 
 def _parser():
@@ -175,6 +179,7 @@ class _Run:
         self.errors = []
         self.texts = {}
         self.tool = None
+        self.event = None
         self.governance = settings.EMPTY.governance
 
     def judge(self, path, text, ranges=None):
@@ -277,12 +282,66 @@ def _sibling_worktree(root, path):
         return None
 
 
+def _covered_paths(root, config):
+    """The paths git lists under the root that the policy judges."""
+    return [path for path in dict.fromkeys(gitio.listed_files(root)) if _judged(config, path)]
+
+
+def _session_directory(root, event):
+    """(the snapshot directory, the session id) of a SessionStart or Stop event; None when the id is unusable."""
+    session_id = event.get("session_id")
+    if not isinstance(session_id, str) or not session.SESSION_ID.match(session_id):
+        return None
+    return gitio.git_path(root, session.SESSIONS), session_id
+
+
+def _record_session(root, load_config, event):
+    """Record the working tree for the session; any failure means there is no snapshot, and nothing is printed."""
+    try:
+        if _work_tree(root, "hook") is None:
+            return
+        config = load_config(root)
+        tree = gitio.snapshot_tree(root, _covered_paths(root, config))
+        located = _session_directory(root, event)
+        if located is not None:
+            session.record(located[0], located[1], tree)
+    except (gitio.GitError, OSError, settings.ConfigError):
+        return
+
+
+def _run_session_end(run, root, load_config, event):
+    """Judge the covered files that changed since the session's snapshot, on the lines that changed."""
+    run.event = "Stop"
+    if _work_tree(root, "all") is None:
+        return
+    located = _session_directory(root, event)
+    if located is None:
+        return
+    before = session.recorded(*located)
+    if before is None:
+        return
+    config = load_config(root)
+    run.governance = config.governance
+    now = gitio.snapshot_tree(root, _covered_paths(root, config))
+    _run_changes(run, root, config, (before, now), _blob_reader(now + ":./"))
+
+
 def _run_hook(run, root, cwd, load_config, stdin, follow_worktrees):
     """Judge the whole file a proposed write would leave, on the lines the write adds or changes."""
     try:
-        target = hook.target(json.loads(_stdin_text(stdin, errors="strict")))
+        event = json.loads(_stdin_text(stdin, errors="strict"))
+        name = event.get("hook_event_name", "PreToolUse") if isinstance(event, dict) else "PreToolUse"
+        if not isinstance(name, str):
+            raise hook.HookInputError("\"hook_event_name\" is not a string")
+        target = hook.target(event) if name == "PreToolUse" else None
     except (ValueError, hook.HookInputError) as error:
         raise _Refused("--hook", HOOK_INPUT % error)
+    if name == "SessionStart":
+        _record_session(root, load_config, event)
+        return
+    if name == "Stop":
+        _run_session_end(run, root, load_config, event)
+        return
     if target is None:
         return
     relative = _relative_to_root(root, cwd, target.path)
@@ -358,11 +417,14 @@ def _hook_closing(tool):
     return report.HOOK_CLOSING + ((report.WRITE_RETRY,) if tool == "Write" else ())
 
 
-def _hook_verdict(run_result, texts, tool, stderr):
+def _hook_verdict(run_result, texts, tool, stderr, event=None):
     """Claude Code blocks a write when its hook exits 2 and shows the agent standard error; a clean write is silent."""
     if not report.exit_code(run_result):
         return 0
-    stderr.write(report.hook_text(run_result, texts, HOOK_HEADER, _hook_closing(tool)))
+    if event == "Stop":
+        stderr.write(report.hook_text(run_result, texts, HOOK_STOP_HEADER, STOP_CLOSING))
+    else:
+        stderr.write(report.hook_text(run_result, texts, HOOK_HEADER, _hook_closing(tool)))
     return 2
 
 
@@ -388,7 +450,7 @@ def main(argv=None, stdin=None, stdout=None, stderr=None, cwd=None):
     if args.hook:
         try:
             run = _execute(args, cwd or os.getcwd(), stdin or sys.stdin)
-            return _hook_verdict(run.report(), run.texts, run.tool, stderr)
+            return _hook_verdict(run.report(), run.texts, run.tool, stderr, run.event)
         except Exception as error:
             stderr.write("%s--hook: could not scan: %s: %s\n" % (HOOK_HEADER, type(error).__name__, error))
             return 2

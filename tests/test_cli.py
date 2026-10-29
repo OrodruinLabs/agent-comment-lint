@@ -1203,3 +1203,126 @@ class TestEntryPoints(Sandbox):
                               capture_output=True)
         self.assertEqual((done.returncode, done.stdout), (2, b""))
         self.assertIn(b"a.ts:1: C1: 2-line prose block (limit 1)", done.stderr)
+
+
+def session_event(name, session_id="s1", **extra):
+    return json.dumps(dict({"hook_event_name": name, "session_id": session_id}, **extra))
+
+
+class TestSessionHooks(Sandbox):
+    def setUp(self):
+        super().setUp()
+        self.init_repo()
+        self.write("a.ts", "const a = 1;\n")
+        self.commit("clean")
+
+    def hook(self, stdin):
+        return self.run_cli("--hook", stdin=stdin)
+
+    def start(self):
+        self.assertEqual(self.hook(session_event("SessionStart", source="startup")), (0, "", ""))
+
+    def stop(self):
+        return self.hook(session_event("Stop", stop_hook_active=False))
+
+    def test_a_violation_written_outside_the_write_tools_blocks_the_stop(self):
+        self.start()
+        self.write("b.ts", "// one\n// two\n")
+        code, out, err = self.stop()
+        self.assertEqual((code, out), (2, ""))
+        self.assertTrue(err.startswith("Before you finish:"), err)
+        self.assertIn("b.ts:1: C1: 2-line prose block (limit 1)", err)
+
+    def test_a_violation_that_predates_the_session_does_not_block(self):
+        self.write("old.ts", "// one\n// two\n")
+        self.start()
+        self.assertEqual(self.stop(), (0, "", ""))
+
+    def test_an_unscannable_file_the_session_never_touched_does_not_block(self):
+        self.write("broken.ts", "const a = `never closed\n")
+        self.start()
+        self.assertEqual(self.stop(), (0, "", ""))
+
+    def test_a_file_the_session_breaks_blocks(self):
+        self.start()
+        self.write("a.ts", "const a = `never closed\n")
+        self.assertEqual(self.stop()[0], 2)
+
+    def test_a_fixed_violation_passes_the_next_stop(self):
+        self.start()
+        self.write("b.ts", "// one\n// two\n")
+        self.assertEqual(self.stop()[0], 2)
+        self.write("b.ts", "// one\n")
+        self.assertEqual(self.stop(), (0, "", ""))
+
+    def test_a_deleted_or_renamed_file_is_not_judged(self):
+        self.write("c.ts", "// one\n// two\n")
+        self.commit("old finding")
+        self.start()
+        os.rename(os.path.join(self.tmp, "c.ts"), os.path.join(self.tmp, "d.ts"))
+        os.remove(os.path.join(self.tmp, "a.ts"))
+        self.assertEqual(self.stop(), (0, "", ""))
+
+    def test_an_ignored_file_is_not_judged(self):
+        self.write(".gitignore", "scratch/\n")
+        self.commit("ignore scratch")
+        self.start()
+        self.write("scratch/x.ts", "// one\n// two\n")
+        self.assertEqual(self.stop(), (0, "", ""))
+
+    def test_no_snapshot_lets_the_session_end(self):
+        self.write("b.ts", "// one\n// two\n")
+        self.assertEqual(self.stop(), (0, "", ""))
+
+    def test_a_second_session_start_keeps_the_first_snapshot(self):
+        self.start()
+        self.write("b.ts", "// one\n// two\n")
+        self.assertEqual(self.hook(session_event("SessionStart", source="compact")), (0, "", ""))
+        self.assertEqual(self.stop()[0], 2)
+
+    def test_an_unsafe_session_id_records_and_judges_nothing(self):
+        self.assertEqual(self.hook(session_event("SessionStart", session_id="../x")), (0, "", ""))
+        self.write("b.ts", "// one\n// two\n")
+        self.assertEqual(self.hook(session_event("Stop", session_id="../x")), (0, "", ""))
+
+    def test_a_snapshot_that_fails_is_silent_and_means_no_check(self):
+        with mock.patch.object(gitio, "snapshot_tree", side_effect=gitio.GitError("boom")):
+            self.start()
+        self.write("b.ts", "// one\n// two\n")
+        self.assertEqual(self.stop(), (0, "", ""))
+
+    def test_git_failing_at_stop_blocks(self):
+        self.start()
+        with mock.patch.object(gitio, "snapshot_tree", side_effect=gitio.GitError("boom")):
+            self.assertEqual(self.stop()[0], 2)
+
+    def test_a_subdirectory_root_reads_its_own_files(self):
+        self.write("sub/a.ts", "const a = 1;\n")
+        self.commit("sub")
+        self.assertEqual(self.run_cli("--hook", "--root", "sub", stdin=session_event("SessionStart"))[0], 0)
+        self.write("sub/a.ts", "// one\n// two\n")
+        code, _out, err = self.run_cli("--hook", "--root", "sub", stdin=session_event("Stop"))
+        self.assertEqual(code, 2)
+        self.assertIn("a.ts:1: C1", err)
+
+    def test_an_unknown_event_is_let_through(self):
+        self.assertEqual(self.hook(session_event("Notification")), (0, "", ""))
+
+    def test_an_event_that_is_not_an_object_or_has_no_string_name_is_refused(self):
+        self.assertEqual(self.hook("[]")[0], 2)
+        self.assertEqual(self.hook(json.dumps({"hook_event_name": 3}))[0], 2)
+
+
+class TestSessionHooksBeforeTheFirstCommit(Sandbox):
+    def test_a_new_violating_file_blocks_the_stop(self):
+        self.init_repo()
+        self.assertEqual(self.run_cli("--hook", stdin=session_event("SessionStart")), (0, "", ""))
+        self.write("b.ts", "// one\n// two\n")
+        self.assertEqual(self.run_cli("--hook", stdin=session_event("Stop"))[0], 2)
+
+
+class TestSessionHooksOutsideGit(Sandbox):
+    def test_outside_a_repository_the_session_ends_normally(self):
+        self.assertEqual(self.run_cli("--hook", stdin=session_event("SessionStart")), (0, "", ""))
+        self.write("b.ts", "// one\n// two\n")
+        self.assertEqual(self.run_cli("--hook", stdin=session_event("Stop")), (0, "", ""))

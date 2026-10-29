@@ -16,6 +16,7 @@ the lexers can and cannot tell apart. The [README](../README.md) covers the basi
 - [What the lexers know and do not know](#what-the-lexers-know-and-do-not-know)
 - [Known false positives](#known-false-positives)
 - [The write-time hook](#the-write-time-hook)
+- [The end-of-session check](#the-end-of-session-check)
 - [Versions](#versions)
 - [Developing](#developing)
 
@@ -331,6 +332,27 @@ finding counts only where it overlaps a line the write adds or changes.
   of the file. A write that changes lines far apart across a very large, repetitive file is still quadratic: about
   6 s at 10,000 lines, and near 30,000 lines a `replace_all` can pass the 60 s hook timeout. Exclude big generated
   files.
+
+## The end-of-session check
+
+A file written through Bash or another tool never reaches the write-time hook. The plugin closes that hole when
+Claude stops. A `SessionStart` entry records a snapshot of the working tree, and a `Stop` entry judges what changed
+since. Both run the same wrapper and `--hook`, which dispatches on the event's `hook_event_name`.
+
+- What is judged: every covered file whose content differs from the snapshot, on the lines changed since it. A file
+  new since the snapshot is judged whole. A file the session never touched is never read, so an old comment or a
+  broken file the session left alone cannot block.
+- A file that changed during the session and cannot be scanned blocks, as exit code 2.
+- On findings the hook exits 2 with the same teaching report, opening "Before you finish:", and Claude keeps working.
+- The snapshot is a git tree built from a temporary index. It writes no ref, no index and nothing in the working
+  tree, only git objects and a file under `git rev-parse --git-path agent-comment-lint/sessions`. Files older than
+  seven days there are removed.
+- No snapshot means no check. The session ends normally when the plugin was installed mid-session, the session was
+  resumed, taking the snapshot failed, or the directory is not a git work tree. Where git fails at stop inside a work
+  tree, the check blocks.
+- Known limit: edits a human makes in their editor during the session count as session changes.
+- Known limit: only the project directory's own working tree is covered, not sibling worktrees.
+- Claude Code caps forced continuations at 8 in a row, and nothing here tries to get around that.
 
 ## Versions
 

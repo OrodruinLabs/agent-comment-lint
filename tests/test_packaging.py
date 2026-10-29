@@ -45,6 +45,15 @@ class TestManifests(unittest.TestCase):
         self.assertEqual(command["onFailure"], "block")
         self.assertTrue(re.fullmatch(entry["matcher"], "Edit") and re.fullmatch(entry["matcher"], "Write"))
 
+    def test_the_session_hooks_run_the_wrapper_and_carry_no_on_failure(self):
+        hooks = load("hooks", "hooks.json")["hooks"]
+        wrapper = "${CLAUDE_PLUGIN_ROOT}/hooks/agent-comment-lint-hook.sh"
+        for event in ("SessionStart", "Stop"):
+            commands = [hook for entry in hooks[event] for hook in entry["hooks"]]
+            self.assertTrue(any(wrapper in hook["command"] for hook in commands), event)
+            self.assertFalse(any("onFailure" in hook for hook in commands), event)
+        self.assertEqual([entry["matcher"] for entry in hooks["PreToolUse"]], ["Write|Edit|MultiEdit"])
+
 
 class TestVersionPins(unittest.TestCase):
     def test_every_version_pin_in_the_docs_and_schema_is_the_package_version(self):

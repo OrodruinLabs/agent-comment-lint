@@ -1,5 +1,5 @@
 {
-  "description": "Blocks a write that adds a comment breaking the agent-comment-lint rules.",
+  "description": "Blocks a write that adds a comment breaking the agent-comment-lint rules, and checks again when Claude stops.",
   "hooks": {
     "PreToolUse": [
       {
@@ -10,6 +10,28 @@
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-comment-lint-hook.sh\"",
             "timeout": 60,
             "onFailure": "block"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-comment-lint-hook.sh\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-comment-lint-hook.sh\"",
+            "timeout": 60
           }
         ]
       }
