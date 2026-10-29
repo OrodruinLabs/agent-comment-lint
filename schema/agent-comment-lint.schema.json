@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.2.0/schema/agent-comment-lint.schema.json",
+  "title": "agent-comment-lint settings",
+  "description": "The .agent-comment-lint.json file at a repository root. Settings can exclude paths and add governance references; they cannot relax a rule.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The URL of this schema, for editors. It is otherwise ignored."
+    },
+    "exclude": {
+      "type": "array",
+      "description": "Paths that are never checked, such as vendored or generated code.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "reason"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/|\\./|\\.\\./)",
+            "description": "A path relative to the repository root. * and ? match inside one directory, ** crosses directories, and a final / takes the whole tree."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S",
+            "description": "Why the path is not judged."
+          }
+        }
+      }
+    },
+    "governance": {
+      "type": "object",
+      "description": "Governance references to refuse in comments, on top of the always-on core.",
+      "additionalProperties": false,
+      "properties": {
+        "packs": {
+          "type": "array",
+          "description": "Reference packs to turn on.",
+          "items": {
+            "enum": ["agent-context", "azure-boards", "decision-ids", "task-ids"]
+          }
+        },
+        "extra": {
+          "type": "array",
+          "description": "Your own reference patterns.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pattern", "reason"],
+            "properties": {
+              "pattern": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A Python regular expression, searched in each comment's text. It must not match empty text."
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S",
+                "description": "Why the pattern is a governance reference."
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

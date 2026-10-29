@@ -8,7 +8,7 @@ import sys
 import tempfile
 import unittest
 
-from agent_comment_lint import __version__
+from agent_comment_lint import __version__, governance
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WRAPPER = os.path.join(REPO, "hooks", "agent-comment-lint-hook.sh")
@@ -116,3 +116,11 @@ class TestAction(unittest.TestCase):
         self.assertIn("::add-matcher::$GITHUB_ACTION_PATH/.github/problem-matcher.json", text)
         self.assertIn("::remove-matcher owner=agent-comment-lint::", text)
         self.assertIn("GITHUB_STEP_SUMMARY", text)
+
+
+class TestSchema(unittest.TestCase):
+    def test_the_schema_names_exactly_the_packs_the_code_knows(self):
+        schema = load("schema", "agent-comment-lint.schema.json")
+        packs = schema["properties"]["governance"]["properties"]["packs"]["items"]["enum"]
+        self.assertEqual(sorted(packs), sorted(governance.PACKS))
+        self.assertFalse(schema["additionalProperties"])

@@ -131,12 +131,14 @@ are no limits to change and no way to silence one comment inline. Every entry st
 
 | Setting | What it does |
 | :--- | :--- |
+| `$schema` | Optional. Lets editors check and complete the file. |
 | `exclude` | Paths that are never checked, such as vendored or generated code. |
 | `governance.packs` | Turns on reference packs, below. |
 | `governance.extra` | Adds your own reference patterns, as regular expressions. |
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.2.0/schema/agent-comment-lint.schema.json",
   "exclude": [{ "path": "vendor/", "reason": "third-party code" }],
   "governance": {
     "packs": ["azure-boards"],

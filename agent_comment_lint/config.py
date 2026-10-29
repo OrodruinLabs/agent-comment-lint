@@ -102,8 +102,10 @@ def parse(text):
         data = json.loads(text)
     except ValueError as error:
         raise ConfigError("not valid JSON: %s" % error)
-    if not isinstance(data, dict) or set(data) - {"exclude", "governance"}:
-        raise ConfigError("expected one object whose only keys are \"exclude\" and \"governance\"")
+    if not isinstance(data, dict) or set(data) - {"$schema", "exclude", "governance"}:
+        raise ConfigError("expected one object whose only keys are \"$schema\", \"exclude\" and \"governance\"")
+    if "$schema" in data and not isinstance(data["$schema"], str):
+        raise ConfigError("\"$schema\" must be a string")
     entries = data.get("exclude", [])
     if not isinstance(entries, list):
         raise ConfigError("\"exclude\" must be a list")

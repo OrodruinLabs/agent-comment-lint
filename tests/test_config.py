@@ -21,6 +21,14 @@ class TestParse(unittest.TestCase):
         with self.assertRaises(config.ConfigError):
             config.parse("{exclude: []}")
 
+    def test_a_schema_line_is_accepted_and_ignored(self):
+        loaded = config.parse('{"$schema": "https://example.com/s.json", "exclude": []}')
+        self.assertEqual(loaded.exclusions, ())
+
+    def test_a_schema_that_is_not_a_string_is_refused(self):
+        with self.assertRaises(config.ConfigError):
+            config.parse('{"$schema": 1}')
+
     def test_an_unknown_key_is_refused_so_no_rule_can_be_set_per_repository(self):
         for text in ('{"max_line": 200}', '{"exclude": [], "limits": {}}', "[]"):
             with self.assertRaises(config.ConfigError, msg=text):
