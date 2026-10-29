@@ -1561,6 +1561,52 @@ class TestSessionHooksAgainstHead(Sandbox):
         self.assertIn("a.md", self.git("ls-files", "-u").stdout)
         self.assertEqual(self.hook("Stop"), (0, "", ""))
 
+    def conflicting_branch(self):
+        """Branch `other` changes a.md as the current branch does, and adds old.ts with an old comment."""
+        self.write("a.md", "base\n")
+        self.commit("notes")
+        self.git("checkout", "-q", "-b", "other")
+        self.write("a.md", "other\n")
+        self.write("old.ts", self.OLD)
+        self.commit("their notes and an old comment")
+        self.git("checkout", "-q", "-")
+        self.write("a.md", "mine\n")
+        self.commit("my notes")
+        return self.git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+
+    def stopped_on_a_conflict(self, *command):
+        subprocess.run(("git",) + command, cwd=self.tmp, capture_output=True)
+        self.assertIn("a.md", self.git("ls-files", "-u").stdout)
+
+    def test_a_merge_stopped_on_a_conflict_brings_in_no_old_line(self):
+        self.conflicting_branch()
+        self.start()
+        self.stopped_on_a_conflict("merge", "other")
+        self.assertEqual(self.hook("Stop"), (0, "", ""))
+
+    def test_a_cherry_pick_stopped_on_a_conflict_brings_in_no_old_line(self):
+        self.conflicting_branch()
+        self.start()
+        self.stopped_on_a_conflict("cherry-pick", "other")
+        self.assertEqual(self.hook("Stop"), (0, "", ""))
+
+    def test_a_rebase_stopped_on_a_conflict_brings_in_no_old_line(self):
+        main = self.conflicting_branch()
+        self.start()
+        self.git("checkout", "-q", "other")
+        self.stopped_on_a_conflict("rebase", main)
+        self.assertEqual(self.hook("Stop"), (0, "", ""))
+
+    def test_a_line_the_session_writes_mid_merge_still_blocks(self):
+        self.conflicting_branch()
+        self.start()
+        self.stopped_on_a_conflict("merge", "other")
+        self.write("old.ts", self.OLD + "// three\n// four\n")
+        code, _out, err = self.hook("Stop")
+        self.assertEqual(code, 2)
+        self.assertIn("old.ts:4: C1:", err)
+        self.assertNotIn("old.ts:1:", err)
+
     def test_a_line_the_session_reverts_to_its_committed_text_is_not_judged(self):
         self.write("a.ts", "// one\n// two\nconst a = 1;\n")
         self.commit("an old block")

@@ -30,6 +30,8 @@ STOP_UNCHECKED = "Before you finish: agent-comment-lint could not check what cha
 STOP_SCOPE = "Only lines changed since this session started and not yet committed are judged.\n"
 STOP_CLOSING = ("Fix these comments before you finish; the check runs again when you stop.",
                 report.HOOK_CLOSING[1], report.HOOK_CLOSING[2])
+# A line one of these commits holds came from someone's commit, not from the session, so Stop leaves it to CI.
+COMMITTED_SIDES = ("HEAD", "MERGE_HEAD", "CHERRY_PICK_HEAD", "REBASE_HEAD")
 
 
 def _parser():
@@ -290,11 +292,11 @@ def _overlap(ranges, other):
     return shared
 
 
-def _run_changes(run, root, config, span, from_blobs=False, not_utf8=None, also=None):
-    """Judge the lines the span changes, from disk or from git's blobs; with `also`, only lines both spans change."""
+def _run_changes(run, root, config, span, from_blobs=False, not_utf8=None, also=()):
+    """Judge the lines the span changes, from disk or from git's blobs, and only those each span in `also` changes."""
     changed = _changed_ranges(run, root, config, span)
-    if also is not None:
-        other = _changed_ranges(run, root, config, also)
+    for other_span in also:
+        other = _changed_ranges(run, root, config, other_span)
         changed = {path: (blob, _overlap(ranges, other[path][1]))
                    for path, (blob, ranges) in changed.items() if path in other}
     if not from_blobs:
@@ -387,9 +389,9 @@ def _run_session_end(run, root, load_config, event):
     config = load_config(root)
     run.governance = config.governance
     now = gitio.snapshot_tree(root, _covered_paths(root, config))
-    # A line HEAD holds came from a commit, a checkout, a pull or a reset, by anyone; pre-commit and CI judge those.
-    head = ("HEAD", now) if gitio.has_head(root) else None
-    _run_changes(run, root, config, (before, now), from_blobs=True, not_utf8=SESSION_NOT_UTF8, also=head)
+    sides = [gitio.commit_id(root, name) for name in COMMITTED_SIDES]
+    also = [(side, now) for side in sides if side is not None]
+    _run_changes(run, root, config, (before, now), from_blobs=True, not_utf8=SESSION_NOT_UTF8, also=also)
 
 
 def _run_hook(run, root, cwd, load_config, stdin, follow_worktrees):

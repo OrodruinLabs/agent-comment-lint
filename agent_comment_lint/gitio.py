@@ -223,15 +223,19 @@ def read_blobs(root, ids):
     return blobs
 
 
-def has_head(root):
-    """True once HEAD names a commit; exit 1 is the only answer that means it does not."""
+def commit_id(root, name):
+    """The id of the commit `name` names; None when it names none, which exit 1 is the only answer for."""
     try:
-        _git(root, "rev-parse", "--verify", "-q", "HEAD")
+        return _git(root, "rev-parse", "--verify", "-q", name + "^{commit}").strip()
     except GitError as error:
         if error.returncode == 1:
-            return False
+            return None
         raise
-    return True
+
+
+def has_head(root):
+    """True once HEAD names a commit."""
+    return commit_id(root, "HEAD") is not None
 
 
 def has_object(root, oid):
