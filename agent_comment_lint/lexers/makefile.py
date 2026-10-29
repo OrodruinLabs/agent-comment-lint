@@ -36,6 +36,9 @@ def _emit_comment(out, text, i):
         if index:
             out.newline(COMMENT)
         out.emit(COMMENT, part)
+        # A blank line ends the logical line, and placing it would keep the block open into the next comment.
+        if index and not part.strip():
+            break
         out.place(BlockLine((part if index else part[1:]).strip(), after_code and not index, False))
 
 

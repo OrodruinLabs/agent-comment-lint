@@ -88,6 +88,15 @@ class TestRubyLiteralsTheLineScannerDoesNotKnow(unittest.TestCase):
         with self.assertRaises(LexError):
             engine.check_text("a.rb", "puts x if a <<b\n")
 
+    def test_a_heredoc_marker_in_a_regex_character_class_is_an_opener(self):
+        # The line scanner does not know regex literals, so `[<<a` in one is the shape of an opener.
+        with self.assertRaises(LexError):
+            engine.check_text("a.rb", "x =~ /[<<a]/\n")
+
+    def test_an_end_marker_inside_a_multi_line_string_ends_the_source(self):
+        # The line scanner cannot see a string that spans lines, so a line of `__END__` in one ends the source.
+        self.assertEqual(found("a.rb", 'x = "a\n__END__\nb"\n# see ADR-7\n'), [])
+
     def test_a_heredoc_after_a_binary_sign_is_not_followed(self):
         # A sign right after a word is read as binary, and `<<` after it as an append, so the payload reads as code.
         self.assertEqual(found("a.rb", "x = a+<<EOS\n# see ADR-7\nEOS\n"), [("C3", 2)])

@@ -308,8 +308,9 @@ governance list are the policy. There is no inline suppression.
   `-`, as in `[<<~SQL, id]` and `+<<~EOS`. After a word or `)` the `<<` is an append, `:<<` is a symbol, and
   `class <<self` opens the singleton class. A plain `<<ID` ends at a terminator in column zero, while `<<-ID` and
   `<<~ID` may be indented. A first-line `#!` is not prose, and a line that is exactly `__END__` ends the source, so
-  the data after it is never judged. An unterminated heredoc or `=begin` is exit code 2. It does not know character
-  literals, percent literals, regex literals, a second heredoc on one line or backtick heredocs.
+  the data after it is never judged; so does such a line inside a multi-line string, which the line scanner cannot
+  see. An unterminated heredoc or `=begin` is exit code 2. It does not know character literals, percent literals,
+  regex literals, a second heredoc on one line or backtick heredocs.
 - TOML is read across lines. Basic, literal and multi-line strings are content, so a `#` inside them opens no
   comment, and a comment after a closing triple quote is read. A one-line string that does not close leaves its line
   unjudged. A multi-line string that never closes is exit code 2.
@@ -352,7 +353,7 @@ accident.
 | Makefile | The text after `;` on a rule line is read as make syntax, so quotes do not protect a hash. `.RECIPEPREFIX` is not read, so a recipe behind a custom prefix is make syntax too. | `all: ; echo "# docs/x"` is C3 |
 | Ruby | A `#` in a character literal, a percent literal or a regex literal starts a comment, also the `#{ }` that opens an interpolation in a regex. | `x = ?#docs/prefix`, `%w[a #docs/prefix]` and `/#docs/prefix/ =~ s` are C3 |
 | Ruby | Only the first heredoc opened on a line is followed, and a backtick heredoc is not one. The payload of the others reads as code. | `foo(<<~A, <<~B)` leaves the payload of `B` judged |
-| Ruby | A `<<` with a word right after it is taken as a heredoc opener after a space, a unary sign or one of `( , = [ { ! & \| ;`, also for an append, and an unterminated one is exit code 2. After a word and a binary sign it is not, so that heredoc's payload is judged. | `puts x if a <<b` is exit code 2, and `x = a+<<EOS` leaves its payload judged |
+| Ruby | A `<<` with a word right after it is taken as a heredoc opener after a space, a unary sign or one of `( , = [ { ! & \| ;`, also for an append, and an unterminated one is exit code 2. After a word and a binary sign it is not, so that heredoc's payload is judged. | `puts x if a <<b` and `x =~ /[<<a]/` are exit code 2, and `x = a+<<EOS` leaves its payload judged |
 | C# | Lines inside a multi-line verbatim string `@"..."` are judged as code. | `// ...` lines inside one are a C1 block |
 | Python, with the `agent-context` pack on | `as requested` and `per the spec` match ordinary prose in a comment. Pinned by `tests/test_known_false_positives.py`. | `# calling CloseHandle as requested in [1]` and `# Map conditions (per the spec) to signals` are C3 |
 

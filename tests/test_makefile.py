@@ -81,6 +81,9 @@ class TestOutsideRecipes(unittest.TestCase):
     def test_a_continued_trailing_comment_is_one_block(self):
         self.assertEqual(found("Makefile", "x = 1 # first prose \\\n  second prose\nall:\n"), [("C1", 1)])
 
+    def test_a_blank_line_after_a_continued_comment_ends_its_block(self):
+        self.assertEqual(found("Makefile", "# a \\\n\n# b\n"), [])
+
     def test_a_long_continuation_of_a_comment_is_reported(self):
         self.assertEqual(found("Makefile", "# one \\\n" + LONG + "\n"), [("C1", 1), ("C7", 2)])
 
