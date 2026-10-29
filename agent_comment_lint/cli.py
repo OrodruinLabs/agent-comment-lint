@@ -19,7 +19,8 @@ BYTE_ORDER_MARK = "\ufeff"
 
 DIFF_MISMATCH = "git counts %d added line(s) but its diff shows %d, so the changed lines cannot be trusted"
 BINARY_NOT_TEXT = "git shows no changed lines for it (a binary file) and it is not UTF-8 text, so it cannot be judged"
-HOOK_INPUT = "standard input is not a Claude Code hook event: %s"
+HOOK_INPUT = "standard input is not a %s hook event: %s"
+PATCH_NOT_APPLIED = "the edit does not apply exactly to the file on disk, so it cannot be judged"
 HOOK_NOT_UTF8 = "is not UTF-8 text, so the write cannot be judged"
 SESSION_NOT_UTF8 = "is not UTF-8 text, so the lines this session changed cannot be judged"
 STAGED_UNMERGED = "is unmerged, so its staged lines cannot be judged"
@@ -50,6 +51,8 @@ def _parser():
     mode.add_argument("--hook", action="store_true",
                       help="read a Claude Code hook event on standard input: judge a PreToolUse write, record a "
                            "snapshot at SessionStart, check what changed at Stop; exit 2 blocks")
+    parser.add_argument("--agent", metavar="NAME", choices=sorted(hook.ADAPTERS),
+                        help="with --hook, the coding agent whose event is on standard input (default: claude)")
     parser.add_argument("--json", action="store_true", help="print one JSON document instead of text")
     parser.add_argument("--root", metavar="DIR",
                         help="repository root (default: the git top level of the working directory)")
@@ -399,23 +402,28 @@ def _run_session_end(run, root, load_config, event):
     _run_changes(run, root, config, (before, now), from_blobs=True, not_utf8=SESSION_NOT_UTF8, also=also)
 
 
-def _run_hook(run, root, cwd, load_config, stdin, follow_worktrees):
-    """Judge the whole file a proposed write would leave, on the lines the write adds or changes."""
+def _run_hook(run, root, cwd, load_config, stdin, follow_worktrees, agent="claude"):
+    """Judge the whole file each proposed write would leave, on the lines the write adds or changes."""
+    title = hook.TITLES[agent]
     try:
         event = json.loads(_stdin_text(stdin, errors="strict"))
-        name = event.get("hook_event_name") if isinstance(event, dict) else None
+        name = event.get("hook_event_name") if isinstance(event, dict) and agent == "claude" else None
         # Any other event is read as a write, so a hook registered by hand on another tool event still judges it.
-        target = None if name in ("SessionStart", "Stop") else hook.target(event)
+        targets = [] if name in ("SessionStart", "Stop") else hook.targets(event, agent)
     except (ValueError, hook.HookInputError) as error:
-        raise _Refused("--hook", HOOK_INPUT % error)
+        raise _Refused("--hook", HOOK_INPUT % (title, error))
     if name == "SessionStart":
         _record_session(root, load_config, event)
         return
     if name == "Stop":
         _run_session_end(run, root, load_config, event)
         return
-    if target is None:
-        return
+    for target in targets:
+        _judge_target(run, root, cwd, load_config, follow_worktrees, target, title)
+
+
+def _judge_target(run, root, cwd, load_config, follow_worktrees, target, title):
+    """Judge one write; `root` is this write's own, so a sibling worktree found here does not leak to the next."""
     relative = _relative_to_root(root, cwd, target.path)
     if relative is None and follow_worktrees:
         # A session started in one checkout often writes into another worktree of the same repository.
@@ -439,15 +447,18 @@ def _run_hook(run, root, cwd, load_config, stdin, follow_worktrees):
             current = None
         after = hook.proposed_text(target, current)
     except hook.HookInputError as error:
-        raise _Refused("--hook", HOOK_INPUT % error)
+        raise _Refused("--hook", HOOK_INPUT % (title, error))
     except UnicodeDecodeError:
         run.errors.append((relative, None, HOOK_NOT_UTF8))
         return
     except OSError as error:
         run.errors.append((relative, None, error.strerror or str(error)))
         return
-    if after is not None:
-        run.judge(relative, after, hook.changed_ranges(current, after))
+    if after is None:
+        if target.must_apply:
+            run.errors.append((relative, None, PATCH_NOT_APPLIED))
+        return
+    run.judge(relative, after, hook.changed_ranges(current, after))
 
 
 def _execute(args, cwd, stdin):
@@ -457,7 +468,7 @@ def _execute(args, cwd, stdin):
         if run.mode == "hook":
             # A write the hook never judges must not depend on the settings file.
             _run_hook(run, root, cwd, lambda judged_root: _load_hook_config(args, judged_root, cwd), stdin,
-                      follow_worktrees=not args.root)
+                      follow_worktrees=not args.root, agent=args.agent or "claude")
             return run
         config = _load_config(args, root, cwd)
         run.governance = config.governance
@@ -484,12 +495,12 @@ def _execute(args, cwd, stdin):
     return run
 
 
-def _hook_closing(tool):
-    """The lines that end a blocked write's message; a Write also learns to re-send only the comment lines."""
-    return report.HOOK_CLOSING + ((report.WRITE_RETRY,) if tool == "Write" else ())
+def _hook_closing(tool, agent):
+    """The lines that end a blocked write's message; a Claude Write also learns to re-send only the comment lines."""
+    return report.HOOK_CLOSING + ((report.WRITE_RETRY,) if tool == "Write" and agent == "claude" else ())
 
 
-def _hook_verdict(run_result, texts, tool, stderr, event=None):
+def _hook_verdict(run_result, texts, tool, stderr, event=None, agent="claude"):
     """Claude Code blocks a write when its hook exits 2 and shows the agent standard error; a clean write is silent."""
     if not report.exit_code(run_result):
         return 0
@@ -497,7 +508,7 @@ def _hook_verdict(run_result, texts, tool, stderr, event=None):
         header = (STOP_FOUND if run_result.findings else STOP_UNCHECKED) + STOP_SCOPE
         stderr.write(report.hook_text(run_result, texts, header, STOP_CLOSING))
     else:
-        stderr.write(report.hook_text(run_result, texts, HOOK_HEADER, _hook_closing(tool)))
+        stderr.write(report.hook_text(run_result, texts, HOOK_HEADER, _hook_closing(tool, agent)))
     return 2
 
 
@@ -520,10 +531,12 @@ def main(argv=None, stdin=None, stdout=None, stderr=None, cwd=None):
     args = parser.parse_args(argv)
     if args.hook and args.json:
         parser.error("--json does not apply to --hook, whose verdict is its exit code")
+    if args.agent and not args.hook:
+        parser.error("--agent applies only to --hook")
     if args.hook:
         try:
             run = _execute(args, cwd or os.getcwd(), stdin or sys.stdin)
-            return _hook_verdict(run.report(), run.texts, run.tool, stderr, run.event)
+            return _hook_verdict(run.report(), run.texts, run.tool, stderr, run.event, args.agent or "claude")
         except Exception as error:
             stderr.write("%s--hook: could not scan: %s: %s\n" % (HOOK_HEADER, type(error).__name__, error))
             return 2

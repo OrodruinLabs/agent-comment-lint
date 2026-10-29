@@ -4,8 +4,9 @@ from collections import namedtuple
 
 WRITE_TOOLS = ("Write", "Edit", "MultiEdit")
 
-Target = namedtuple("Target", ["tool", "path", "tool_input"])
-Target.__doc__ = "A write the hook judges: the tool's name, the file it writes, and the tool's own input."
+Target = namedtuple("Target", ["tool", "path", "tool_input", "must_apply"], defaults=[False])
+Target.__doc__ = ("A write the hook judges: the tool's name, the file it writes, the tool's own input, and whether an "
+                  "edit that does not apply to the file on disk is an error.")
 
 
 class HookInputError(Exception):
@@ -26,6 +27,22 @@ def target(event):
     if not isinstance(path, str) or not path:
         raise HookInputError("%s with no \"tool_input.file_path\"" % tool)
     return Target(tool, path, tool_input)
+
+
+def _claude(event):
+    found = target(event)
+    return [] if found is None else [found]
+
+
+ADAPTERS = {"claude": _claude}
+TITLES = {"claude": "Claude Code"}
+
+
+def targets(event, agent):
+    """The writes an agent's event proposes, which is none for an event that writes no file the hook judges."""
+    if not isinstance(event, dict):
+        raise HookInputError("expected a JSON object")
+    return ADAPTERS[agent](event)
 
 
 def _string(value, name):

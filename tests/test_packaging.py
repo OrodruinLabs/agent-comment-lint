@@ -273,3 +273,108 @@ class TestSchema(unittest.TestCase):
         packs = schema["properties"]["governance"]["properties"]["packs"]["items"]["enum"]
         self.assertEqual(sorted(packs), sorted(governance.PACKS))
         self.assertFalse(schema["additionalProperties"])
+
+
+GUARD = os.path.join(REPO, "integrations", "guard", "agent-comment-lint-guard")
+CAPTURE = os.path.join(REPO, "integrations", "capture", "capture-event")
+NOT_INSTALLED = b"Blocked: agent-comment-lint is not installed."
+
+
+def fake_command(tmp, body):
+    """A fake `agent-comment-lint` in `tmp`: a `.cmd` on Windows, a `#!/bin/sh` script elsewhere."""
+    if os.name != "nt":
+        fake_bin(tmp, **{"agent-comment-lint": body})
+        return
+    with open(os.path.join(tmp, "agent-comment-lint.cmd"), "w", encoding="utf-8", newline="\r\n") as handle:
+        handle.write("@echo off\r\n%s\r\n" % body)
+
+
+def script_command(name):
+    """The command line that runs a `.sh` script under the POSIX shell, or a `.cmd` one under cmd on Windows."""
+    return ["cmd", "/c", name + ".cmd"] if os.name == "nt" else [SHELL, name + ".sh"]
+
+
+def exit_body(code):
+    return "exit /b %d" % code if os.name == "nt" else "exit %d" % code
+
+
+def save_stdin_body(path):
+    """Fake body that writes its standard input to `path`; `findstr` copies every line on Windows."""
+    return 'findstr "^" > "%s"' % path if os.name == "nt" else 'cat > "%s"' % path
+
+
+@unittest.skipUnless(SHELL, "no POSIX shell on PATH")
+class TestGuards(unittest.TestCase):
+    def run_guard(self, body, stdin=b"", agent="claude"):
+        with tempfile.TemporaryDirectory() as tmp:
+            bin_dir = os.path.join(tmp, "bin")
+            os.mkdir(bin_dir)
+            if body is not None:
+                fake_command(bin_dir, body.replace("{tmp}", tmp))
+            # With no fake, a POSIX PATH holds only the shell's own directory, so no installed command is reached.
+            path = os.environ["PATH"] if body is not None or os.name == "nt" else os.path.dirname(SHELL)
+            env = dict(os.environ, PATH=bin_dir + os.pathsep + path)
+            done = subprocess.run(script_command(GUARD) + [agent], input=stdin, capture_output=True, env=env)
+            done.saved = {}
+            for name in os.listdir(tmp):
+                if name != "bin":
+                    with open(os.path.join(tmp, name), "rb") as handle:
+                        done.saved[name] = handle.read().replace(b"\r\n", b"\n")
+            return done
+
+    def test_the_guards_keep_their_line_endings_on_every_checkout(self):
+        with open(os.path.join(REPO, ".gitattributes"), encoding="utf-8") as handle:
+            rules = [line.split() for line in handle.read().splitlines()]
+        self.assertIn(["*.cmd", "text", "eol=crlf"], rules)
+        for name in (GUARD, CAPTURE):
+            with open(name + ".cmd", "rb") as handle:
+                self.assertIn(b"\r\n", handle.read())
+            with open(name + ".sh", "rb") as handle:
+                self.assertNotIn(b"\r", handle.read())
+
+    def test_a_missing_command_is_blocked_with_two(self):
+        done = self.run_guard(None)
+        self.assertEqual(done.returncode, 2)
+        self.assertIn(NOT_INSTALLED, done.stderr)
+
+    def test_a_clean_verdict_passes(self):
+        self.assertEqual(self.run_guard(exit_body(0)).returncode, 0)
+
+    def test_a_violation_verdict_is_blocked_with_two(self):
+        self.assertEqual(self.run_guard(exit_body(1)).returncode, 2)
+
+    def test_a_could_not_scan_verdict_stays_two(self):
+        self.assertEqual(self.run_guard(exit_body(2)).returncode, 2)
+
+    def test_the_command_receives_standard_input_unchanged(self):
+        done = self.run_guard(save_stdin_body("{tmp}" + os.sep + "stdin.txt") + "\n" + exit_body(0), b'{"a": 1}\n')
+        self.assertEqual(done.saved["stdin.txt"], b'{"a": 1}\n')
+
+    def test_the_command_is_told_the_hook_mode_and_the_agent(self):
+        echo = "echo %*" if os.name == "nt" else 'echo "$@"'
+        done = self.run_guard("%s > {tmp}%sargs.txt\n%s" % (echo, os.sep, exit_body(0)), agent="copilot")
+        self.assertEqual(done.saved["args.txt"].split(), [b"--hook", b"--agent", b"copilot"])
+
+
+@unittest.skipUnless(SHELL, "no POSIX shell on PATH")
+class TestCapture(unittest.TestCase):
+    def run_capture(self, stdin, capture):
+        env = dict(os.environ)
+        env.pop("AGENT_COMMENT_LINT_CAPTURE", None)
+        if capture is not None:
+            env["AGENT_COMMENT_LINT_CAPTURE"] = capture
+        return subprocess.run(script_command(CAPTURE), input=stdin, capture_output=True, env=env)
+
+    def test_stdin_and_a_newline_are_appended(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = os.path.join(tmp, "events.jsonl")
+            for event in (b'{"a": 1}', b'{"b": 2}'):
+                self.assertEqual(self.run_capture(event, target).returncode, 0)
+            with open(target, "rb") as handle:
+                self.assertEqual(handle.read().splitlines(), [b'{"a": 1}', b'{"b": 2}'])
+
+    def test_an_unset_file_says_so_and_appends_nothing(self):
+        for capture in (None, ""):
+            done = self.run_capture(b"{}", capture)
+            self.assertEqual(done.returncode, 0)
+            self.assertIn(b"AGENT_COMMENT_LINT_CAPTURE", done.stderr)

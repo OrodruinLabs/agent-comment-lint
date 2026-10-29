@@ -80,6 +80,12 @@ class TestUsage(Sandbox):
     def test_no_mode_is_a_usage_error(self):
         self.assert_usage_error()
 
+    def test_agent_without_hook_is_a_usage_error(self):
+        self.assert_usage_error("--agent", "claude", "--all")
+
+    def test_an_unknown_agent_is_a_usage_error(self):
+        self.assert_usage_error("--hook", "--agent", "nope")
+
     def test_files_with_no_paths_is_a_usage_error(self):
         self.assert_usage_error("--files")
 
