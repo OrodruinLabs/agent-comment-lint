@@ -415,14 +415,20 @@ Register one as an agent's hook to record real events for a new adapter.
 When a Codex patch or a Gemini or Windsurf edit does not apply exactly to the file on disk, the write is blocked with
 "the edit does not apply exactly to the file on disk, so it cannot be judged".
 
+A Codex patch is blocked the same way when Codex releases before 0.162.0 would write other lines than later ones,
+because the hook cannot tell which release runs it. That happens when a context line matches the file only loosely
+(other whitespace or punctuation, or a lone carriage return). It also happens when a hunk with no context adds lines
+at the end of a file that ends in an empty line, or where another hunk adds lines too. Context lines copied exactly
+from the file avoid it.
+
 ### Codex CLI
 
 - Event: `PreToolUse` for `apply_patch`. `tool_input.command` is the patch text.
 - Mapping: each Add is judged as a new file. Each Update is applied to the file on disk and judged on the changed
   lines. A moved file is judged at its destination, on the lines changed relative to its source. When the policy
   does not judge the source (another file type, a skipped folder or an excluded path), every line of the
-  destination counts as changed. A Delete is not judged. Relative paths resolve against the event's `cwd`. A patch Codex itself would refuse is blocked, with its
-  reason. Context that matches nothing is blocked as above.
+  destination counts as changed. A Delete is not judged. Relative paths resolve against the event's `cwd`. A patch
+  Codex itself would refuse is blocked, with its reason. Context that matches nothing is blocked as above.
 - Install, per project: put `agent-comment-lint` on PATH, copy `integrations/codex/hooks.json` to
   `<repo>/.codex/hooks.json`, copy the guard scripts to `<repo>/.codex/`, and review and trust the hook with `/hooks`.
   Codex loads a project's `.codex/` only for a trusted project, and records trust against the hook's hash, so a new

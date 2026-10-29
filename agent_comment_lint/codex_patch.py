@@ -210,13 +210,16 @@ def parse_patch(text):
     return parser.parsed()
 
 
-def _seek(lines, pattern, start, at_end):
+def _seek(lines, pattern, start, at_end, preserve=True):
     """seek_sequence.rs: where `pattern` first matches at or after `start`, each pass looser than the last."""
     if not pattern:
         return start
     if len(pattern) > len(lines):
         return None
-    first = max(len(lines) - len(pattern), start) if at_end else start
+    first = start
+    if at_end:
+        # Releases before 0.162.0 seek an end-of-file hunk from the end even when that is before `start`.
+        first = max(len(lines) - len(pattern), start) if preserve else len(lines) - len(pattern)
     for key in (str, lambda line: line.rstrip(WHITESPACE), _trim, lambda line: _trim(line).translate(PUNCTUATION)):
         for index in range(first, len(lines) - len(pattern) + 1):
             if all(key(line) == key(want) for line, want in zip(lines[index:index + len(pattern)], pattern)):
@@ -224,7 +227,7 @@ def _seek(lines, pattern, start, at_end):
     return None
 
 
-def _replacements(lines, hunks):
+def _replacements(lines, hunks, preserve):
     """file_update.rs: the (start, length, new lines) each hunk makes, in file order; None where one cannot apply."""
     found = []
     index = 0
@@ -235,19 +238,22 @@ def _replacements(lines, hunks):
                 return None
             index = at + 1
         if not hunk.old_lines:
-            found.append((len(lines), 0, list(hunk.new_lines)))
+            # Releases before 0.162.0 put a pure addition before a final empty line.
+            last_empty = not preserve and lines and lines[-1] == ""
+            found.append((len(lines) - 1 if last_empty else len(lines), 0, list(hunk.new_lines)))
             continue
         pattern, new = list(hunk.old_lines), list(hunk.new_lines)
-        start = _seek(lines, pattern, index, hunk.at_end)
+        start = _seek(lines, pattern, index, hunk.at_end, preserve)
         if start is None and pattern[-1] == "":
             # A trailing empty line stands for the file's last newline, which the file's lines do not hold.
             pattern = pattern[:-1]
             new = new[:-1] if new and new[-1] == "" else new
-            start = _seek(lines, pattern, index, hunk.at_end)
+            start = _seek(lines, pattern, index, hunk.at_end, preserve)
         if start is None:
             return None
         old_from = new_from = 0
-        for old_at, new_at in hunk.context:
+        # Releases before 0.162.0 write a context line as the patch spells it, not as the file holds it.
+        for old_at, new_at in hunk.context if preserve else ():
             if old_at >= len(pattern) or new_at >= len(new):
                 break
             if (old_from, new_from) != (old_at, new_at):
@@ -260,10 +266,22 @@ def _replacements(lines, hunks):
 
 
 def apply_hunks(text, hunks):
-    """The text Codex writes for an update; None where Codex would refuse the patch. Each line keeps its ending."""
+    """The text a Codex update leaves; None where Codex refuses it, or where its releases would write other lines."""
+    written = applied(text, hunks)
+    if written is None:
+        return None
+    # The hook cannot tell which release runs it, and releases before 0.162.0 are still installed.
+    older = applied(text, hunks, preserve_line_endings=False)
+    return written if older is None or older.splitlines() == written.splitlines() else None
+
+
+def applied(text, hunks, preserve_line_endings=True):
+    """The text one Codex release writes: 0.162.0 and later preserve line endings, earlier ones normalize to LF."""
+    if not preserve_line_endings:
+        return _normalized_to_lf(text, hunks)
     parts = re.split("(\r\n|\r|\n)", text)
     source = list(zip(parts[0::2], parts[1::2])) + ([(parts[-1], None)] if parts[-1] else [])
-    replacements = _replacements([line for line, _ending in source], hunks)
+    replacements = _replacements([line for line, _ending in source], hunks, preserve=True)
     if replacements is None:
         return None
     preferred = next((ending for _line, ending in source if ending), "\n")
@@ -274,3 +292,18 @@ def apply_hunks(text, hunks):
         done = start + length
     result.extend(source[done:])
     return "".join(line + (ending or preferred) for line, ending in result)
+
+
+def _normalized_to_lf(text, hunks):
+    """Before 0.162.0, by default: the file split on \\n alone, and each hunk written whole and in reverse order."""
+    lines = text.split("\n")
+    if lines[-1] == "":
+        lines.pop()
+    replacements = _replacements(lines, hunks, preserve=False)
+    if replacements is None:
+        return None
+    for start, length, new in reversed(replacements):
+        lines[start:start + length] = new
+    if not lines or lines[-1] != "":
+        lines.append("")
+    return "\n".join(lines)

@@ -9,7 +9,8 @@
 - Guard and capture scripts: `integrations/guard/` turns a missing command or any failure into exit 2, and
   `integrations/capture/` records an agent's events to `AGENT_COMMENT_LINT_CAPTURE` so a new adapter can be built.
 - `PATCH_NOT_APPLIED`: a Codex patch or a Windsurf or Gemini edit that does not apply to the file on disk is blocked
-  with "the edit does not apply exactly to the file on disk, so it cannot be judged".
+  with "the edit does not apply exactly to the file on disk, so it cannot be judged". So is a Codex patch that
+  releases before 0.162.0 would write differently from later ones.
 - No finding moves.
 
 ## 1.3.0

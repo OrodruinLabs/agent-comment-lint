@@ -3,7 +3,7 @@ import json
 import os
 import unittest
 
-from agent_comment_lint import hook
+from agent_comment_lint import codex_patch, hook
 
 FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "agents")
 CLAUDE_WRITE = {"tool_name": "Write", "tool_input": {"file_path": "a.ts", "content": "const a = 1;\n"}}
@@ -270,9 +270,15 @@ class TestCodexHunks(unittest.TestCase):
         text = "a \u2013 \u201cb\u201d\u00a0\u2019c\u2019\n"
         self.assertEqual(self.apply(text, hunk(["a - \"b\" 'c'"], ["d"])), "d\n")
 
-    def test_a_context_line_keeps_the_text_of_the_file(self):
-        self.assertEqual(self.apply("    keep  \nold\n", hunk(["keep", "old"], ["keep", "new"], context=((0, 0),))),
-                         "    keep  \nnew\n")
+    def test_a_context_line_keeps_the_line_ending_of_the_file(self):
+        self.assertEqual(self.apply("keep\r\nold\n", hunk(["keep", "old"], ["keep", "new"], context=((0, 0),))),
+                         "keep\r\nnew\r\n")
+
+    def test_a_context_line_matched_loosely_does_not_apply(self):
+        self.assertIsNone(self.apply("    keep  \nold\n", hunk(["keep", "old"], ["keep", "new"], context=((0, 0),))))
+
+    def test_insertions_older_releases_put_in_another_order_do_not_apply(self):
+        self.assertIsNone(self.apply("x\n# a\n", hunk([], ["y"]), hunk(["# a"], ["# a", "# b"], context=((0, 0),))))
 
     def test_an_end_of_file_hunk_matches_at_the_end(self):
         self.assertEqual(self.apply("x\ny\nx\n", hunk(["x"], ["z"], at_end=True)), "x\ny\nz\n")
@@ -304,6 +310,38 @@ class TestCodexHunks(unittest.TestCase):
 
     def test_every_line_ends_with_a_newline_afterwards(self):
         self.assertEqual(self.apply("a\nb", hunk(["a"], ["x"])), "x\nb\n")
+
+
+class TestCodexReleases(unittest.TestCase):
+    """The text each Codex release writes: 0.162.0 and later preserve line endings, earlier ones normalize to LF."""
+
+    def both(self, text, *hunks):
+        return tuple(codex_patch.applied(text, list(hunks), preserve) for preserve in (True, False))
+
+    def test_a_pure_addition_and_an_insertion_at_the_end_come_out_in_another_order(self):
+        hunks = (hunk([], ["y = 1"]), hunk(["# old"], ["# old", "# new"], context=((0, 0),)))
+        self.assertEqual(self.both("x = 0\n# old\n", *hunks),
+                         ("x = 0\n# old\ny = 1\n# new\n", "x = 0\n# old\n# new\ny = 1\n"))
+
+    def test_only_later_releases_keep_the_text_of_a_context_line_matched_loosely(self):
+        self.assertEqual(self.both("    keep  \nold\n", hunk(["keep", "old"], ["keep", "new"], context=((0, 0),))),
+                         ("    keep  \nnew\n", "keep\nnew\n"))
+
+    def test_only_later_releases_end_a_line_at_a_lone_carriage_return(self):
+        found = hunk(["a\rb", "y"], ["a\rb", "z"], context=((0, 0),))
+        self.assertEqual(self.both("a\rb\ny\n", found), (None, "a\rb\nz\n"))
+
+    def test_only_later_releases_keep_the_ending_of_a_line_they_write(self):
+        self.assertEqual(self.both("a\r\nb\r\n", hunk(["a"], ["x"])), ("x\r\nb\r\n", "x\nb\r\n"))
+
+    def test_earlier_releases_add_a_pure_addition_before_a_final_empty_line(self):
+        self.assertEqual(self.both("a\n\n", hunk([], ["b"])), ("a\n\nb\n", "a\nb\n"))
+
+    def test_earlier_releases_seek_an_end_of_file_hunk_from_the_end_alone(self):
+        self.assertEqual(self.both("a\nb\n", hunk(["b"], ["c"]), hunk(["b"], ["d"], at_end=True)), (None, "a\nc\n"))
+
+    def test_a_patch_both_releases_write_alike_applies(self):
+        self.assertEqual(hook.apply_codex_hunks("a\r\nb\r\n", [hunk(["a"], ["x"])]), "x\r\nb\r\n")
 
 
 class TestWindsurfAdapter(AdapterContract, unittest.TestCase):

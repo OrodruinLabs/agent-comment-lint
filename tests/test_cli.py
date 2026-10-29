@@ -1327,6 +1327,27 @@ class TestHookCodex(Sandbox):
         self.assertEqual(self.run_codex("*** Update File: a.py", "*** Move to: moved.py", "@@", "-x = 1", "+x = 2"),
                          (0, "", ""))
 
+    def test_an_addition_older_codex_releases_order_differently_is_blocked(self):
+        self.write_bytes("x.py", b"x = 0\n# existing prose\n")
+        code, _out, err = self.run_codex("*** Update File: x.py", "@@", "+y = 1", "@@", " # existing prose",
+                                         "+# new prose line")
+        self.assertEqual(code, 2)
+        self.assertIn("x.py: could not scan: " + cli.PATCH_NOT_APPLIED, err)
+
+    def test_a_context_line_older_codex_releases_rewrite_is_blocked(self):
+        comment = "# " + "w" * 110
+        self.write_bytes("c.py", ("def f():\n    %s\n    x = 1\n" % comment).encode("utf-8"))
+        code, _out, err = self.run_codex("*** Update File: c.py", "@@", " def f():", "             " + comment,
+                                         "-    x = 1", "+    x = 2")
+        self.assertEqual(code, 2)
+        self.assertIn("c.py: could not scan: " + cli.PATCH_NOT_APPLIED, err)
+
+    def test_a_context_line_only_older_codex_releases_find_across_a_lone_carriage_return_is_blocked(self):
+        self.write_bytes("a.py", b"x = 'a\rb'\ny = 1\n")
+        code, _out, err = self.run_codex("*** Update File: a.py", "@@", " x = 'a\rb'", "-y = 1", "+y = 2")
+        self.assertEqual(code, 2)
+        self.assertIn("a.py: could not scan: " + cli.PATCH_NOT_APPLIED, err)
+
     def test_a_move_whose_destination_is_out_of_scope_is_not_judged(self):
         self.write("a.ts", "const a = 1;\n")
         outside = os.path.join(os.path.dirname(self.tmp), "elsewhere.ts")
