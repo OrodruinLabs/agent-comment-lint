@@ -280,6 +280,7 @@ class TestSchema(unittest.TestCase):
 GUARD = os.path.join(REPO, "integrations", "guard", "agent-comment-lint-guard")
 CAPTURE = os.path.join(REPO, "integrations", "capture", "capture-event")
 NOT_INSTALLED = b"Blocked: agent-comment-lint is not installed."
+FAILED = b"Blocked: agent-comment-lint failed with exit code "
 
 
 def fake_command(tmp, body):
@@ -351,9 +352,14 @@ class TestGuards(unittest.TestCase):
     def test_a_violation_verdict_is_blocked_with_two(self):
         self.assertEqual(self.run_guard(exit_body(1)).returncode, 2)
 
+    def test_a_silent_failure_is_blocked_with_two_and_a_reason(self):
+        done = self.run_guard(exit_body(3))
+        self.assertEqual((done.returncode, done.stderr.strip()), (2, FAILED + b"3."))
+
     @unittest.skipUnless(os.name == "nt", "a negative exit code is a Windows crash code")
     def test_a_negative_exit_code_is_blocked_with_two(self):
-        self.assertEqual(self.run_guard("exit /b -1").returncode, 2)
+        done = self.run_guard("exit /b -1")
+        self.assertEqual((done.returncode, done.stderr.strip()), (2, FAILED + b"-1."))
 
     @unittest.skipUnless(os.name == "nt", "only cmd looks in the working directory before PATH")
     def test_a_command_in_the_working_directory_is_not_run(self):
@@ -362,7 +368,9 @@ class TestGuards(unittest.TestCase):
         self.assertIn(NOT_INSTALLED, done.stderr)
 
     def test_a_could_not_scan_verdict_stays_two(self):
-        self.assertEqual(self.run_guard(exit_body(2)).returncode, 2)
+        done = self.run_guard(exit_body(2))
+        self.assertEqual(done.returncode, 2)
+        self.assertNotIn(FAILED, done.stderr)
 
     def test_the_command_receives_standard_input_unchanged(self):
         done = self.run_guard(save_stdin_body("{tmp}" + os.sep + "stdin.txt") + "\n" + exit_body(0), b'{"a": 1}\n')

@@ -9,6 +9,9 @@ if not defined ACL_COMMAND (
   exit /b 2
 )
 call "%ACL_COMMAND%" --hook --agent %1
+set "ACL_CODE=%errorlevel%"
 rem Negative exit codes, such as a crash, are failures too, which "if errorlevel 1" would miss.
-if not "%errorlevel%"=="0" exit /b 2
-exit /b 0
+if "%ACL_CODE%"=="0" exit /b 0
+rem Codex lets a patch through on exit 2 with nothing on stderr, so a failure that printed nothing still gives a reason.
+if not "%ACL_CODE%"=="2" echo Blocked: agent-comment-lint failed with exit code %ACL_CODE%.>&2
+exit /b 2
