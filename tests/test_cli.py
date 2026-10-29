@@ -1570,6 +1570,40 @@ class TestSessionHooksAgainstHead(Sandbox):
         self.assertEqual(self.hook("Stop"), (0, "", ""))
 
 
+class TestAnEntryNamedHead(Sandbox):
+    """A root entry named like a revision must not make git read a revision as a path, or refuse it as ambiguous."""
+
+    def setUp(self):
+        super().setUp()
+        self.init_repo()
+        self.write("HEAD/a.ts", "const a = 1;\n")
+        self.base = self.commit("a directory named HEAD")
+
+    def hook(self, name):
+        return self.run_cli("--hook", stdin=session_event(name))
+
+    def test_a_stop_with_nothing_changed_is_clean(self):
+        self.assertEqual(self.hook("SessionStart"), (0, "", ""))
+        self.assertEqual(self.hook("Stop"), (0, "", ""))
+
+    def test_a_violation_the_session_writes_still_blocks(self):
+        self.assertEqual(self.hook("SessionStart"), (0, "", ""))
+        self.write("HEAD/b.ts", "// one\n// two\n")
+        code, out, err = self.hook("Stop")
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("HEAD/b.ts:1: C1: 2-line prose block (limit 1)", err)
+
+    def test_diff_and_staged_judge_the_lines_they_select(self):
+        self.write("HEAD/a.ts", "const a = 1;\n// one\n// two\n")
+        self.commit("add a block")
+        code, out, err = self.run_cli("--diff", self.base)
+        self.assertEqual((code, out.splitlines()[0], err), (1, "HEAD/a.ts:2: C1: 2-line prose block (limit 1)", ""))
+        self.write("HEAD/b.ts", "// three\n// four\n")
+        self.git("add", "HEAD/b.ts")
+        code, out, err = self.run_cli("--staged")
+        self.assertEqual((code, out.splitlines()[0], err), (1, "HEAD/b.ts:1: C1: 2-line prose block (limit 1)", ""))
+
+
 class TestSessionHooksBeforeTheFirstCommit(Sandbox):
     def test_a_new_violating_file_blocks_the_stop(self):
         self.init_repo()

@@ -138,12 +138,12 @@ def _changed_files(text):
 
 def changed_files(root, span):
     """{path: Change} for each path the span adds or changes under `root`."""
-    return _changed_files(_git(root, "diff", "--raw", "--numstat", "-z", "--no-abbrev", *DIFF_SHAPE, *span))
+    return _changed_files(_git(root, "diff", "--raw", "--numstat", "-z", "--no-abbrev", *DIFF_SHAPE, *span, "--"))
 
 
 def changed_diff(root, span):
-    """The zero-context diff of the same span, for `diff.parse_diff_ranges`."""
-    return _git(root, "diff", *DIFF_SHAPE, *span)
+    """The zero-context diff of the same span, for `diff.parse_diff_ranges`; `--` keeps a path named `HEAD` a path."""
+    return _git(root, "diff", *DIFF_SHAPE, *span, "--")
 
 
 def git_path(root, name):
