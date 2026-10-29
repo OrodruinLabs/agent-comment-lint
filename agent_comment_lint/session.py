@@ -4,8 +4,9 @@ import re
 import time
 
 SESSIONS = "agent-comment-lint/sessions"
-SESSION_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
-OBJECT_ID = re.compile(r"^[0-9a-f]{40}([0-9a-f]{24})?$")
+# `\Z`, unlike `$`, does not match before a final newline, so each id must be the whole string.
+SESSION_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}\Z")
+OBJECT_ID = re.compile(r"^[0-9a-f]{40}([0-9a-f]{24})?\Z")
 MAX_AGE_SECONDS = 7 * 24 * 3600
 
 

@@ -1385,6 +1385,13 @@ class TestSessionHooks(Sandbox):
         self.write("b.ts", "// one\n// two\n")
         self.assertEqual(self.hook(session_event("Stop", session_id="../x")), (0, "", ""))
 
+    def test_a_session_id_with_a_trailing_newline_records_and_judges_nothing(self):
+        self.assertEqual(self.hook(session_event("SessionStart", session_id="abc\n")), (0, "", ""))
+        sessions = gitio.git_path(self.tmp, session.SESSIONS)
+        self.assertEqual(os.listdir(sessions) if os.path.isdir(sessions) else [], [])
+        self.write("b.ts", "// one\n// two\n")
+        self.assertEqual(self.hook(session_event("Stop", session_id="abc\n")), (0, "", ""))
+
     def test_a_snapshot_that_fails_is_silent_and_means_no_check(self):
         with mock.patch.object(gitio, "snapshot_tree", side_effect=gitio.GitError("boom")):
             self.start()

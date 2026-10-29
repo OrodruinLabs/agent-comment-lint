@@ -52,3 +52,8 @@ class TestSessionFiles(unittest.TestCase):
             with open(os.path.join(self.directory, "s"), "w", encoding="ascii") as handle:
                 handle.write(text)
             self.assertEqual(session.recorded(self.directory, "s"), expected, text)
+
+    def test_the_id_patterns_match_whole_strings_only(self):
+        self.assertIsNone(session.SESSION_ID.match("abc\n"))
+        self.assertIsNone(session.OBJECT_ID.match(ID + "\n"))
+        self.assertTrue(session.SESSION_ID.match("abc") and session.OBJECT_ID.match(ID))
