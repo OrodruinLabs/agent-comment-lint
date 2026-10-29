@@ -1380,6 +1380,12 @@ class TestSessionHooks(Sandbox):
         self.assertEqual(self.hook(session_event("SessionStart", source="compact")), (0, "", ""))
         self.assertEqual(self.stop()[0], 2)
 
+    def test_a_second_session_start_does_not_build_a_snapshot(self):
+        self.start()
+        with mock.patch.object(gitio, "snapshot_tree", wraps=gitio.snapshot_tree) as snapshot:
+            self.assertEqual(self.hook(session_event("SessionStart", source="resume")), (0, "", ""))
+        snapshot.assert_not_called()
+
     def test_an_unsafe_session_id_records_and_judges_nothing(self):
         self.assertEqual(self.hook(session_event("SessionStart", session_id="../x")), (0, "", ""))
         self.write("b.ts", "// one\n// two\n")
