@@ -121,3 +121,10 @@ class TestGoCgoPreamble(unittest.TestCase):
         # The preamble is C source for cgo, but to Go it is a comment, so its lines read as prose.
         text = 'package a\n\n// #include <stdlib.h>\n// static int twice(int x) { return 2 * x; }\nimport "C"\n'
         self.assertEqual(found("a.go", text), [("C1", 3)])
+
+
+class TestJavaUnicodeEscapes(unittest.TestCase):
+    def test_a_unicode_newline_escape_in_a_line_comment_is_not_a_line_end(self):
+        # javac translates the escape before lexing, so the code after it is code; here it reads as comment text.
+        text = "int a; // end \\u000a see ADR-9\n"
+        self.assertEqual(found("A.java", text), [("C3", 1)])

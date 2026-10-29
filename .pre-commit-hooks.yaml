@@ -4,10 +4,10 @@
   entry: agent-comment-lint --files
   language: python
   pass_filenames: true
-  files: (\.(cs|ts|tsx|mts|cts|js|jsx|mjs|cjs|css|sh|ya?ml|tf|tfvars|hcl|py|rb|rake|gemspec|toml|dockerfile|mk|go)|(^|/)(Gemfile|Rakefile|Dockerfile|Containerfile|Makefile|makefile|GNUmakefile))$
+  files: (\.(cs|ts|tsx|mts|cts|js|jsx|mjs|cjs|css|sh|ya?ml|tf|tfvars|hcl|py|rb|rake|gemspec|toml|dockerfile|mk|go|java)|(^|/)(Gemfile|Rakefile|Dockerfile|Containerfile|Makefile|makefile|GNUmakefile))$
 - id: agent-comment-lint-staged
   name: agent-comment-lint (staged lines)
   entry: agent-comment-lint --staged
   language: python
   pass_filenames: false
-  files: (\.(cs|ts|tsx|mts|cts|js|jsx|mjs|cjs|css|sh|ya?ml|tf|tfvars|hcl|py|rb|rake|gemspec|toml|dockerfile|mk|go)|(^|/)(Gemfile|Rakefile|Dockerfile|Containerfile|Makefile|makefile|GNUmakefile))$
+  files: (\.(cs|ts|tsx|mts|cts|js|jsx|mjs|cjs|css|sh|ya?ml|tf|tfvars|hcl|py|rb|rake|gemspec|toml|dockerfile|mk|go|java)|(^|/)(Gemfile|Rakefile|Dockerfile|Containerfile|Makefile|makefile|GNUmakefile))$

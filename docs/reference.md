@@ -356,6 +356,7 @@ accident.
 | Ruby | A `<<` with a word right after it is taken as a heredoc opener after a space, a unary sign or one of `( , = [ { ! & \| ;`, also for an append, and an unterminated one is exit code 2. After a word and a binary sign it is not, so that heredoc's payload is judged. | `puts x if a <<b` and `x =~ /[<<a]/` are exit code 2, and `x = a+<<EOS` leaves its payload judged |
 | C# | Lines inside a multi-line verbatim string `@"..."` are judged as code. | `// ...` lines inside one are a C1 block |
 | Go | The cgo preamble, the comment right before `import "C"`, holds C code, and its lines count as comment prose. | `// #include <stdlib.h>` / `// static int twice(int x) { return 2 * x; }` / `import "C"` is C1 |
+| Java | A `\u000a` escape inside a `//` comment ends the comment in javac, which translates escapes first. Here the comment runs on, so the code after the escape is read as comment text. | `// end \u000a see ADR-9` is C3 even though `see ADR-9` is code |
 | Python, with the `agent-context` pack on | `as requested` and `per the spec` match ordinary prose in a comment. Pinned by `tests/test_known_false_positives.py`. | `# calling CloseHandle as requested in [1]` and `# Map conditions (per the spec) to signals` are C3 |
 
 ## The write-time hook
