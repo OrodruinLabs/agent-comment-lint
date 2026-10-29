@@ -4,7 +4,7 @@ import re
 from .base import CODE, COMMENT, STRING, Family, LexError, Line
 from .hashlike import HASH_ONLY
 
-DEFINE = re.compile(r"\s*(?:(?:override|export|private)\s+)*define(?:\s+(?![:?+!]*=)|$)")
+DEFINE = re.compile(r"\s*(?:(?:override|export|private)\s+)*define(?:\s+(?![\s:?+!]*=)|$)")
 ENDEF = re.compile(r"\s*endef(?=\s|#|$)")
 CLOSERS = {"(": ")", "{": "}"}
 # A shell `#` starts a comment only where a word could start.

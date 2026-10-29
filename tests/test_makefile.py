@@ -166,3 +166,7 @@ class TestAssignmentsAndLineEndings(unittest.TestCase):
 
     def test_an_exported_assignment_with_a_trailing_comment_is_read(self):
         self.assertEqual(found("Makefile", "export X = 1 # see ADR-9\n"), [("C3", 1)])
+
+    def test_an_assignment_to_define_with_wide_spacing_opens_no_block(self):
+        for head in ("define  = 1", "define\t = 1", "define \t:=  1"):
+            self.assertEqual(found("Makefile", head + "\n"), [], repr(head))
