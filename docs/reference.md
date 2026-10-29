@@ -61,6 +61,12 @@ Enable either the plugin or the command, not both, or every write is judged twic
 
 Without `fetch-depth: 0` on the checkout the merge base is missing, and the step exits 2.
 
+To post the findings as review comments instead, pipe the command through reviewdog:
+
+```yaml
+- run: agent-comment-lint --diff origin/${{ github.base_ref }} | reviewdog -efm="%f:%l: %m" -reporter=github-pr-review -filter-mode=added
+```
+
 ### pre-commit
 
 The hook works with pre-commit and prek. It judges the whole of each staged file, not only its changed lines. A

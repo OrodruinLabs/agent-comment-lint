@@ -97,3 +97,22 @@ class TestHookWrapper(unittest.TestCase):
                                     PATH=bin_dir + os.pathsep + os.environ["PATH"])
         self.assertEqual(done.returncode, 2)
         self.assertIn(b"Blocked: agent-comment-lint needs Python 3.9 or newer on PATH.", done.stderr)
+
+
+class TestAction(unittest.TestCase):
+    def matcher(self):
+        return re.compile(load(".github", "problem-matcher.json")["problemMatcher"][0]["pattern"][0]["regexp"])
+
+    def test_the_problem_matcher_reads_findings_and_nothing_else(self):
+        hit = self.matcher().match("src/a.ts:12: C1: 3-line prose block (limit 1)")
+        self.assertEqual(hit.groups(), ("src/a.ts", "12", "C1", "3-line prose block (limit 1)"))
+        for line in ("agent-comment-lint: 2 violation(s) in 1 of 57 file(s) scanned.",
+                     "a.ts: could not scan: is a directory, not a file", "a.ts:3: could not scan: line 3: x"):
+            self.assertIsNone(self.matcher().match(line), line)
+
+    def test_the_action_registers_and_removes_the_matcher_and_keeps_the_exit_code(self):
+        with open(os.path.join(REPO, "action.yml"), encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertIn("::add-matcher::$GITHUB_ACTION_PATH/.github/problem-matcher.json", text)
+        self.assertIn("::remove-matcher owner=agent-comment-lint::", text)
+        self.assertIn("GITHUB_STEP_SUMMARY", text)

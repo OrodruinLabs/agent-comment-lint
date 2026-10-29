@@ -90,7 +90,8 @@ jobs:
 ```
 
 Only the lines the pull request changes are checked. Keep `fetch-depth: 0`, or the step cannot see what changed and
-fails. The inputs are in [the reference](docs/reference.md#github-actions).
+fails. Findings appear as annotations on the changed lines. GitHub shows at most 10 per step, and the job summary
+lists them all. The inputs are in [the reference](docs/reference.md#github-actions).
 
 ### pre-commit
 

@@ -28,10 +28,21 @@ runs:
         py=$(command -v python3 || command -v python) || py=
         [ -n "$py" ] || { echo "agent-comment-lint: no Python on PATH" >&2; exit 2; }
         case "$MODE" in
-          all) exec "$py" "$script" --all $ARGS ;;
+          all) set -- --all ;;
           diff)
             base=${BASE:-${TARGET:+origin/$TARGET}}
             [ -n "$base" ] || { echo "agent-comment-lint: set the base input outside a pull request" >&2; exit 2; }
-            exec "$py" "$script" --diff "$base" $ARGS ;;
+            set -- --diff "$base" ;;
           *) echo "agent-comment-lint: mode must be diff or all, not $MODE" >&2; exit 2 ;;
         esac
+        out=$(mktemp)
+        echo "::add-matcher::$GITHUB_ACTION_PATH/.github/problem-matcher.json"
+        "$py" "$script" "$@" $ARGS >"$out" 2>&1
+        code=$?
+        cat "$out"
+        if [ "$code" -ne 0 ] && [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+          { echo '```'; cat "$out"; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
+        fi
+        rm -f "$out"
+        echo "::remove-matcher owner=agent-comment-lint::"
+        exit "$code"
