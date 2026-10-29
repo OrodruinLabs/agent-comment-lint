@@ -366,12 +366,12 @@ def _record_session(root, load_config, event):
 def _run_session_end(run, root, load_config, event):
     """Judge the covered files changed since the session's snapshot, on the changed lines not yet committed."""
     run.event = "Stop"
-    if _work_tree(root, "all") is None:
+    try:
+        located = _session_directory(root, event)
+    except gitio.GitError:
+        # Where git cannot name the sessions directory, the session start could not record a snapshot either.
         return
-    located = _session_directory(root, event)
-    if located is None:
-        return
-    before = session.recorded(*located)
+    before = None if located is None else session.recorded(*located)
     if before is None:
         return
     config = load_config(root)

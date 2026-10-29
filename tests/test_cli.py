@@ -1484,3 +1484,9 @@ class TestSessionHooksOutsideGit(Sandbox):
         self.assertEqual(self.run_cli("--hook", stdin=session_event("SessionStart")), (0, "", ""))
         self.write("b.ts", "// one\n// two\n")
         self.assertEqual(self.run_cli("--hook", stdin=session_event("Stop")), (0, "", ""))
+
+    def test_in_a_repository_git_cannot_read_there_is_no_snapshot_so_the_session_ends(self):
+        self.write(".git", "gitdir: %s\n" % os.path.join(self.tmp, "missing"))
+        self.assertEqual(self.run_cli("--hook", stdin=session_event("SessionStart")), (0, "", ""))
+        self.write("b.ts", "// one\n// two\n")
+        self.assertEqual(self.run_cli("--hook", stdin=session_event("Stop")), (0, "", ""))

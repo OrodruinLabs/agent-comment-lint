@@ -356,8 +356,8 @@ since. Both run the same wrapper and `--hook`, which dispatches on the event's `
   seven days there are removed.
 - No snapshot means no check. The session ends normally when the plugin was installed mid-session, taking the snapshot
   failed, or the directory is not a git work tree. The snapshot is the first one recorded for the session id, so a
-  resumed or compacted session with none gets one at that moment, and the check covers changes from then on. Where git
-  fails at stop inside a work tree, the check blocks.
+  resumed or compacted session with none gets one at that moment, and the check covers changes from then on. Once a
+  snapshot is found, a git failure at stop blocks.
 - Known limit: edits a human makes in their editor during the session count as session changes.
 - Known limit: only the project directory's own working tree is covered, not sibling worktrees.
 - Claude Code caps forced continuations at 8 in a row, and nothing here tries to get around that.
