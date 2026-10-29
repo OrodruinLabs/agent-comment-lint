@@ -7,7 +7,7 @@
           {
             "type": "command",
             "command": "sh \"$(git rev-parse --show-toplevel)/.codex/agent-comment-lint-guard.sh\" codex || exit 2",
-            "commandWindows": "for /f \"delims=\" %R in ('git rev-parse --show-toplevel') do @call \"%R/.codex/agent-comment-lint-guard.cmd\" codex || exit /b 2",
+            "commandWindows": "git rev-parse --show-toplevel >nul || exit /b 2 & for /f \"delims=\" %R in ('git rev-parse --show-toplevel') do @call \"%R/.codex/agent-comment-lint-guard.cmd\" codex || exit /b 2",
             "statusMessage": "Checking comments with agent-comment-lint"
           }
         ]

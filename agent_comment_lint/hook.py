@@ -66,15 +66,22 @@ def _codex(event):
         raise HookInputError("apply_patch with no \"tool_input.command\"")
     cwd = event.get("cwd")
     found = []
+    named, moved_to = set(), set()
     for change in parse_codex_patch(command):
         path = _codex_path(cwd, change.path)
+        key = os.path.normpath(path)
+        # Codex refuses a second operation on a path, yet updates a file an earlier move wrote, which disk cannot show.
+        if key in named or (change.kind == "update" and key in moved_to):
+            raise HookInputError("apply_patch: more than one operation targets %s" % change.path)
+        named.add(key)
         if change.kind == "add":
             found.append(Target("Write", path, {"file_path": path, "content": change.content}))
         elif change.kind == "update" and change.move_to is None:
             found.append(Target("CodexPatch", path, {"file_path": path, "hunks": change.hunks}, True))
         elif change.kind == "update":
-            found.append(Target("CodexPatch", _codex_path(cwd, change.move_to),
-                                {"file_path": path, "hunks": change.hunks}, True, path))
+            destination = _codex_path(cwd, change.move_to)
+            moved_to.add(os.path.normpath(destination))
+            found.append(Target("CodexPatch", destination, {"file_path": path, "hunks": change.hunks}, True, path))
     return found
 
 

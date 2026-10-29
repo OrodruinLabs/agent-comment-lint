@@ -423,14 +423,15 @@ class TestCodexTemplate(unittest.TestCase):
         self.assertIn('/.codex/agent-comment-lint-guard.sh" codex', handler["command"])
         self.assertIn('/.codex/agent-comment-lint-guard.cmd" codex', handler["commandWindows"])
 
-    def run_hook(self, patch, guards=(".sh", ".cmd")):
+    def run_hook(self, patch, guards=(".sh", ".cmd"), in_git=True):
         """Codex runs `$SHELL -lc command`, or `%COMSPEC% /C "commandWindows"`, in the session's directory."""
         with tempfile.TemporaryDirectory() as tmp:
             repo = os.path.join(os.path.realpath(tmp), "repo")
             session = os.path.join(repo, "src")
             os.makedirs(os.path.join(repo, ".codex"))
             os.mkdir(session)
-            subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+            if in_git:
+                subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
             shutil.copy(CODEX_HOOKS, os.path.join(repo, ".codex"))
             for suffix in guards:
                 shutil.copy(GUARD + suffix, os.path.join(repo, ".codex"))
@@ -438,7 +439,8 @@ class TestCodexTemplate(unittest.TestCase):
             os.mkdir(bin_dir)
             arguments = "%*" if os.name == "nt" else '"$@"'
             fake_command(bin_dir, '"%s" -m agent_comment_lint %s' % (sys.executable, arguments))
-            env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ["PATH"], PYTHONPATH=REPO)
+            env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ["PATH"], PYTHONPATH=REPO,
+                       GIT_CEILING_DIRECTORIES=os.path.realpath(tmp))
             event = dict(fixture("codex-write"), cwd=session, tool_input={"command": patch})
             if os.name == "nt":
                 command = 'cmd /C "%s"' % self.handler()["commandWindows"]
@@ -447,19 +449,25 @@ class TestCodexTemplate(unittest.TestCase):
             return subprocess.run(command, input=json.dumps(event).encode("utf-8"), cwd=session, env=env,
                                   capture_output=True)
 
-    @unittest.skipUnless(SHELL, "no POSIX shell on PATH")
+    @unittest.skipUnless(SHELL or os.name == "nt", "no POSIX shell on PATH")
     def test_a_patch_adding_a_two_line_comment_is_blocked_from_a_subdirectory(self):
         done = self.run_hook("*** Begin Patch\n*** Add File: dirty.ts\n+// one\n+// two\n*** End Patch")
         self.assertEqual(done.returncode, 2, done.stderr)
         self.assertIn(b"src/dirty.ts:1: C1: 2-line prose block (limit 1)", done.stderr)
 
-    @unittest.skipUnless(SHELL, "no POSIX shell on PATH")
+    @unittest.skipUnless(SHELL or os.name == "nt", "no POSIX shell on PATH")
     def test_a_clean_patch_passes_silently(self):
         done = self.run_hook("*** Begin Patch\n*** Add File: clean.ts\n+const a = 1;\n*** End Patch")
         self.assertEqual((done.returncode, done.stdout, done.stderr), (0, b"", b""))
 
-    @unittest.skipUnless(SHELL, "no POSIX shell on PATH")
+    @unittest.skipUnless(SHELL or os.name == "nt", "no POSIX shell on PATH")
     def test_a_missing_guard_is_blocked_with_two_and_a_reason(self):
         done = self.run_hook("*** Begin Patch\n*** Add File: clean.ts\n+const a = 1;\n*** End Patch", guards=())
+        self.assertEqual(done.returncode, 2)
+        self.assertNotEqual(done.stderr.strip(), b"")
+
+    @unittest.skipUnless(SHELL or os.name == "nt", "no POSIX shell on PATH")
+    def test_a_session_outside_a_git_work_tree_is_blocked_with_two_and_a_reason(self):
+        done = self.run_hook("*** Begin Patch\n*** Add File: clean.ts\n+const a = 1;\n*** End Patch", in_git=False)
         self.assertEqual(done.returncode, 2)
         self.assertNotEqual(done.stderr.strip(), b"")

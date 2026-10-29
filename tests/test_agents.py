@@ -109,6 +109,22 @@ class TestCodexAdapter(AdapterContract, unittest.TestCase):
         self.assertEqual([(found.tool, found.path) for found in self.targets(event)],
                          [("Write", at_repo("a.py")), ("CodexPatch", at_repo("c.py"))])
 
+    def test_two_operations_on_one_path_are_refused(self):
+        for lines in (("*** Update File: a.py", "*** Move to: b.py", "@@", "+x", "*** Update File: b.py", "@@", "+y"),
+                      ("*** Update File: a.py", "*** Move to: ./b.py", "@@", "+x", "*** Update File: b.py", "@@", "+y"),
+                      ("*** Update File: a.py", "@@", "+x", "*** Update File: ./a.py", "@@", "+y"),
+                      ("*** Add File: a.py", "+x", "*** Update File: a.py", "@@", "+y"),
+                      ("*** Add File: a.py", "+x", "*** Delete File: a.py"),
+                      ("*** Delete File: a.py", "*** Add File: a.py", "+x")):
+            with self.subTest(lines=lines):
+                with self.assertRaises(hook.HookInputError):
+                    self.targets(codex_event(patch(*lines)))
+
+    def test_a_moved_file_may_be_added_or_deleted_later_as_codex_allows(self):
+        moved = ("*** Update File: a.py", "*** Move to: b.py", "@@", "+x")
+        self.assertEqual(len(self.targets(codex_event(patch(*moved + ("*** Add File: b.py", "+y"))))), 2)
+        self.assertEqual(len(self.targets(codex_event(patch(*moved + ("*** Delete File: b.py",))))), 1)
+
     def test_a_relative_path_resolves_against_the_event_cwd_only_when_it_is_a_string(self):
         for cwd, expected in (("/elsewhere", os.path.join("/elsewhere", "a.py")), ("", "a.py"), (None, "a.py"),
                               (7, "a.py")):

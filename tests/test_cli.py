@@ -1326,6 +1326,14 @@ class TestHookCodex(Sandbox):
         self.assertEqual(code, 2)
         self.assertIn("a.ts: could not scan: " + cli.MOVED_FROM_OUTSIDE, err)
 
+    def test_an_update_of_a_file_an_earlier_move_wrote_is_blocked(self):
+        self.write("a.ts", "const a = 1;\n")
+        self.write("b.ts", "const a = 1;\n")
+        code, _out, err = self.run_codex("*** Update File: a.ts", "*** Move to: b.ts", "@@", "+// one", " const a = 1;",
+                                         "*** Update File: b.ts", "@@", "+// two", " const a = 1;")
+        self.assertEqual(code, 2)
+        self.assertIn("more than one operation targets b.ts", err)
+
     def test_patch_paths_are_relative_to_the_event_cwd(self):
         os.mkdir(os.path.join(self.tmp, "sub"))
         code, _out, err = self.run_codex("*** Add File: a.ts", "+// one", "+// two", cwd=os.path.join(self.tmp, "sub"))
