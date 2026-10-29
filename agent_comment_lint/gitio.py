@@ -144,23 +144,32 @@ def git_path(root, name):
 
 
 def snapshot_tree(root, paths):
-    """The id of a tree holding `paths` as on disk, built in a copy of the index so the real one is untouched."""
-    handle, scratch = tempfile.mkstemp(prefix="agent-comment-lint-index-")
-    os.close(handle)
+    """A tree of the whole repository with `paths` (relative to `root`) as on disk; read entries as `tree:./path`."""
+    try:
+        handle, scratch = tempfile.mkstemp(prefix="agent-comment-lint-index-")
+        os.close(handle)
+    except OSError as error:
+        raise GitError("the temporary index could not be made: %s" % (error.strerror or error))
     try:
         real = git_path(root, "index")
-        if os.path.exists(real):
-            shutil.copyfile(real, scratch)
-        else:
-            # Git refuses an existing empty file as an index.
-            os.remove(scratch)
+        try:
+            if os.path.exists(real):
+                shutil.copyfile(real, scratch)
+            else:
+                # Git refuses an existing empty file as an index.
+                os.remove(scratch)
+        except OSError as error:
+            raise GitError("the temporary index could not be made: %s" % (error.strerror or error))
         env = {"GIT_INDEX_FILE": scratch}
         listing = "".join(path + "\0" for path in paths).encode("utf-8")
         _git_bytes(root, "update-index", "--add", "--remove", "-z", "--stdin", env=env, input=listing)
         return _git_bytes(root, "write-tree", env=env).decode("ascii").strip()
     finally:
-        if os.path.exists(scratch):
+        try:
             os.remove(scratch)
+        except OSError:
+            # A stray file in the temp directory is harmless; raising here would turn a good snapshot into a failure.
+            pass
 
 
 def blob(root, spec):
@@ -183,4 +192,4 @@ def committed_blob(root, path):
     """The bytes of `path` at HEAD, or None when HEAD lacks it."""
     if not _git(root, "ls-tree", "-z", "HEAD", "--", path):
         return None
-    return blob(root, "HEAD:" + path)
+    return blob(root, "HEAD:./" + path)

@@ -120,3 +120,51 @@ class TestRepository(unittest.TestCase):
         path = gitio.git_path(self.tmp, "index")
         self.assertTrue(os.path.isabs(path))
         self.assertEqual(os.path.basename(path), "index")
+
+    def subdirectory(self):
+        self.write("a.ts", b"top\n")
+        os.mkdir(os.path.join(self.tmp, "sub"))
+        self.write("sub/a.ts", b"sub\n")
+        self.commit()
+        return os.path.join(self.tmp, "sub")
+
+    def test_committed_blob_reads_the_path_under_a_subdirectory_root(self):
+        sub = self.subdirectory()
+        self.assertEqual(gitio.committed_blob(sub, "a.ts"), b"sub\n")
+
+    def test_a_snapshot_taken_in_a_subdirectory_holds_the_files_under_that_root(self):
+        sub = self.subdirectory()
+        self.write("sub/a.ts", b"changed\n")
+        tree = gitio.snapshot_tree(sub, ["a.ts"])
+        self.assertEqual(gitio.blob(sub, tree + ":./a.ts"), b"changed\n")
+
+    def test_a_temporary_index_that_cannot_be_made_is_a_git_error(self):
+        self.write("a.ts", b"one\n")
+        self.commit()
+        with mock.patch.object(shutil, "copyfile", side_effect=OSError(28, "No space left on device")):
+            with self.assertRaises(gitio.GitError):
+                gitio.snapshot_tree(self.tmp, ["a.ts"])
+
+    def test_has_head_raises_outside_any_repository(self):
+        outside = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
+        with mock.patch.dict(os.environ, {"GIT_CEILING_DIRECTORIES": os.path.dirname(outside)}):
+            with self.assertRaises(gitio.GitError):
+                gitio.has_head(outside)
+
+    def test_an_empty_snapshot_is_still_a_tree(self):
+        self.write("a.ts", b"one\n")
+        self.commit()
+        tree = gitio.snapshot_tree(self.tmp, [])
+        self.assertEqual(gitio.blob(self.tmp, tree + ":a.ts"), b"one\n")
+
+    def test_a_path_with_a_space_survives_the_snapshot(self):
+        self.write("my file.ts", b"one\n")
+        tree = gitio.snapshot_tree(self.tmp, ["my file.ts"])
+        self.assertEqual(gitio.blob(self.tmp, tree + ":my file.ts"), b"one\n")
+
+    def test_a_blob_that_does_not_exist_is_a_git_error(self):
+        self.write("a.ts", b"one\n")
+        self.commit()
+        with self.assertRaises(gitio.GitError):
+            gitio.blob(self.tmp, "HEAD:./missing.ts")
