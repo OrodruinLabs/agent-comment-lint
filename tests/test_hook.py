@@ -1,7 +1,15 @@
 """The hook's reading of a PreToolUse event: which file, what it would hold, which lines the write touched."""
+import time
 import unittest
 
 from agent_comment_lint import hook
+
+
+PERIODIC = ["alpha = 1", "", "beta = 2"]
+
+
+def lines(rows):
+    return "".join(row + "\n" for row in rows)
 
 
 def target(tool, **tool_input):
@@ -95,3 +103,22 @@ class TestChangedRanges(unittest.TestCase):
 
     def test_windows_line_endings_compare_as_lines(self):
         self.assertEqual(hook.changed_ranges("a\r\nc\r\n", "a\r\nb\r\nc\r\n"), [(2, 2)])
+
+    def test_one_inserted_line_in_a_repetitive_file_is_only_that_line(self):
+        rows = PERIODIC * 3333
+        after = rows[:1] + ["// new"] + rows[1:]
+        self.assertEqual(hook.changed_ranges(lines(rows), lines(after)), [(2, 2)])
+
+    def test_a_one_line_edit_to_a_50000_line_file_takes_under_a_second(self):
+        rows = (PERIODIC * 16667)[:50000]
+        after = list(rows)
+        after[24999] = "// changed"
+        started = time.perf_counter()
+        found = hook.changed_ranges(lines(rows), lines(after))
+        self.assertLess(time.perf_counter() - started, 1.0)
+        self.assertEqual(found, [(25000, 25000)])
+
+    def test_replace_all_far_apart_reports_only_those_two_lines(self):
+        rows = ["k"] + PERIODIC * 700 + ["k"]
+        after = ["z"] + PERIODIC * 700 + ["z"]
+        self.assertEqual(hook.changed_ranges(lines(rows), lines(after)), [(1, 1), (2102, 2102)])

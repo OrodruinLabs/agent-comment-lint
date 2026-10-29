@@ -81,5 +81,14 @@ def proposed_text(target, current):
 
 def changed_ranges(before, after):
     """Inclusive (start, end) line ranges of `after` that the write added or changed, as a line diff finds them."""
-    matcher = difflib.SequenceMatcher(None, (before or "").splitlines(), after.splitlines(), autojunk=False)
-    return [(first + 1, last) for tag, _i1, _i2, first, last in matcher.get_opcodes() if tag in ("replace", "insert")]
+    old, new = (before or "").splitlines(), after.splitlines()
+    shared = min(len(old), len(new))
+    head = 0
+    while head < shared and old[head] == new[head]:
+        head += 1
+    tail = 0
+    while tail < shared - head and old[-1 - tail] == new[-1 - tail]:
+        tail += 1
+    matcher = difflib.SequenceMatcher(None, old[head:len(old) - tail], new[head:len(new) - tail], autojunk=False)
+    return [(head + first + 1, head + last) for tag, _i1, _i2, first, last in matcher.get_opcodes()
+            if tag in ("replace", "insert")]

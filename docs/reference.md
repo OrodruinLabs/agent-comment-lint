@@ -289,8 +289,8 @@ finding counts only where it overlaps a line the write adds or changes.
 - Known limit: Claude Code also matches curly quotes against straight ones and tries escape variants of
   `old_string`. The hook matches exactly, plus line endings, so such an edit is let through as one the tool would
   refuse.
-- Known limit: the changed-line diff is quadratic on a very large file with many identical lines (10,000 lines took
-  about 7 seconds). Exclude big generated files in `.agent-comment-lint.json`.
+- Known limit: the changed lines are found after trimming the lines a write leaves untouched at the start and end
+  of the file. A write that changes lines far apart across a very large, repetitive file is still slower.
 
 ## Versions
 
