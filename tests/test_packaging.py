@@ -58,8 +58,10 @@ class TestManifests(unittest.TestCase):
         commands = [hook["command"] for entry in load("hooks", "hooks.json")["hooks"]["SessionStart"]
                     for hook in entry["hooks"]]
         self.assertIn('cat "${CLAUDE_PLUGIN_ROOT}/hooks/session-guidance.txt"', commands)
-        with open(os.path.join(REPO, "hooks", "session-guidance.txt"), encoding="utf-8") as handle:
-            self.assertEqual(len(handle.read().splitlines()), 2)
+        with open(os.path.join(REPO, "hooks", "session-guidance.txt"), "rb") as handle:
+            self.assertEqual(handle.read(),
+                             b"Comments here are at most one line and say why the code is the way it is.\n"
+                             b"Notes for reviewers go in the commit message or the PR description, not in code.\n")
 
 
 class TestVersionPins(unittest.TestCase):

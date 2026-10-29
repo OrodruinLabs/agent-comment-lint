@@ -1269,6 +1269,28 @@ class TestHookCommittedSettings(Sandbox):
         self.write(".agent-comment-lint.json", self.EXCLUDE_A)
         self.assertEqual(self.dirty_write(), (0, "", ""))
 
+    def test_a_committed_settings_file_that_is_not_utf_8_blocks(self):
+        self.write_bytes(".agent-comment-lint.json", b"\xff\xfe{")
+        self.commit("settings that are not UTF-8")
+        code, _out, err = self.dirty_write()
+        self.assertEqual(code, 2)
+        self.assertIn(".agent-comment-lint.json: could not scan: is not UTF-8 text", err)
+
+    def test_a_subdirectory_root_reads_its_own_settings_as_committed(self):
+        self.write("sub/a.ts", "const a = 1;\n")
+        self.write("sub/.agent-comment-lint.json", self.EXCLUDE_A)
+        write = event("Write", "sub/a.ts", content="// one\n// two\n")
+        self.assertEqual(self.run_cli("--hook", "--root", "sub", stdin=write)[0], 2)
+        self.commit("exclude sub/a.ts")
+        self.assertEqual(self.run_cli("--hook", "--root", "sub", stdin=write), (0, "", ""))
+
+    def test_git_failing_while_the_committed_settings_are_read_blocks(self):
+        for name in ("has_head", "committed_blob"):
+            with self.subTest(name=name), mock.patch.object(gitio, name, side_effect=gitio.GitError("boom")):
+                code, _out, err = self.dirty_write()
+                self.assertEqual(code, 2)
+                self.assertIn("git: could not scan: boom", err)
+
     def test_an_explicit_config_is_read_from_disk(self):
         self.write("cfg.json", self.EXCLUDE_A)
         result = self.run_cli("--hook", "--config", "cfg.json",

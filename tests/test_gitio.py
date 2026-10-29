@@ -1,6 +1,7 @@
 """Reading git's answers: a record that is not shaped as asked is a git failure, never a traceback."""
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -8,6 +9,8 @@ import unittest
 from unittest import mock
 
 from agent_comment_lint import gitio
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class TestChangedFiles(unittest.TestCase):
@@ -258,3 +261,23 @@ class TestRepository(unittest.TestCase):
             with mock.patch.object(gitio, "_git_bytes", return_value=answer):
                 with self.assertRaises(gitio.GitError, msg=answer):
                     gitio.read_blobs(self.tmp, [oid])
+
+
+def remove_tree(path):
+    """Remove a tree that holds git's read-only object files, which Windows will not delete as they are."""
+    for directory, _names, files in os.walk(path):
+        for name in files:
+            os.chmod(os.path.join(directory, name), stat.S_IWRITE)
+    shutil.rmtree(path, ignore_errors=True)
+
+
+@unittest.skipUnless(os.name == "nt", "on Windows CI the checkout and the temporary directory sit on two drives")
+class TestSnapshotOnTheCheckoutsDrive(unittest.TestCase):
+    def test_a_snapshot_works_with_its_temporary_index_on_another_drive(self):
+        tmp = tempfile.mkdtemp(dir=os.path.dirname(REPO))
+        self.addCleanup(remove_tree, tmp)
+        subprocess.run(["git", "init", "-q"], cwd=tmp, capture_output=True, check=True)
+        with open(os.path.join(tmp, "a.ts"), "wb") as handle:
+            handle.write(b"one\n")
+        tree = gitio.snapshot_tree(tmp, ["a.ts"])
+        self.assertEqual(gitio.blob(tmp, tree + ":a.ts"), b"one\n")
