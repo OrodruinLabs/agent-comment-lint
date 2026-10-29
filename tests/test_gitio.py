@@ -1,4 +1,8 @@
 """Reading git's answers: a record that is not shaped as asked is a git failure, never a traceback."""
+import os
+import shutil
+import subprocess
+import tempfile
 import unittest
 
 from unittest import mock
@@ -42,3 +46,77 @@ class TestChangedFiles(unittest.TestCase):
                 with self.assertRaises(gitio.GitError, msg=output) as caught:
                     self.changes(output)
                 self.assertTrue(str(caught.exception).startswith("git diff %s printed a record" % kind), output)
+
+
+class TestRepository(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.git("init", "-q")
+        self.git("config", "user.email", "test@example.com")
+        self.git("config", "user.name", "Test")
+
+    def git(self, *args):
+        return subprocess.run(["git"] + list(args), cwd=self.tmp, capture_output=True, text=True, check=True).stdout
+
+    def write(self, name, text):
+        with open(os.path.join(self.tmp, name), "wb") as handle:
+            handle.write(text)
+
+    def commit(self):
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "c")
+
+    def test_a_snapshot_holds_tracked_and_untracked_paths_as_they_are_on_disk(self):
+        self.write("a.ts", b"one\n")
+        self.commit()
+        self.write("a.ts", b"one\ntwo\n")
+        self.write("b.ts", b"new\n")
+        tree = gitio.snapshot_tree(self.tmp, ["a.ts", "b.ts"])
+        self.assertEqual(gitio.blob(self.tmp, tree + ":a.ts"), b"one\ntwo\n")
+        self.assertEqual(gitio.blob(self.tmp, tree + ":b.ts"), b"new\n")
+
+    def test_a_snapshot_leaves_the_real_index_untouched(self):
+        self.write("a.ts", b"one\n")
+        self.commit()
+        self.write("b.ts", b"new\n")
+        self.git("add", "b.ts")
+        before = self.git("diff", "--cached", "--name-only")
+        gitio.snapshot_tree(self.tmp, ["a.ts", "b.ts", "c.ts"])
+        self.assertEqual(self.git("diff", "--cached", "--name-only"), before)
+
+    def test_a_snapshot_works_before_the_first_commit(self):
+        self.write("a.ts", b"one\n")
+        tree = gitio.snapshot_tree(self.tmp, ["a.ts"])
+        self.assertEqual(gitio.blob(self.tmp, tree + ":a.ts"), b"one\n")
+
+    def test_a_deleted_tracked_path_is_absent_from_the_snapshot(self):
+        self.write("a.ts", b"one\n")
+        self.commit()
+        os.remove(os.path.join(self.tmp, "a.ts"))
+        tree = gitio.snapshot_tree(self.tmp, ["a.ts"])
+        self.assertEqual(self.git("ls-tree", tree, "--", "a.ts"), "")
+
+    def test_two_trees_diff_as_a_span(self):
+        self.write("a.ts", b"one\n")
+        old = gitio.snapshot_tree(self.tmp, ["a.ts"])
+        self.write("a.ts", b"one\ntwo\n")
+        new = gitio.snapshot_tree(self.tmp, ["a.ts"])
+        self.assertEqual(gitio.changed_files(self.tmp, (old, new))["a.ts"].added, 1)
+
+    def test_committed_blob_is_none_for_a_path_head_lacks(self):
+        self.write("a.ts", b"one\n")
+        self.commit()
+        self.assertEqual(gitio.committed_blob(self.tmp, "a.ts"), b"one\n")
+        self.assertIsNone(gitio.committed_blob(self.tmp, "missing.ts"))
+
+    def test_has_head_is_false_before_the_first_commit(self):
+        self.assertFalse(gitio.has_head(self.tmp))
+        self.write("a.ts", b"one\n")
+        self.commit()
+        self.assertTrue(gitio.has_head(self.tmp))
+
+    def test_git_path_is_absolute(self):
+        path = gitio.git_path(self.tmp, "index")
+        self.assertTrue(os.path.isabs(path))
+        self.assertEqual(os.path.basename(path), "index")

@@ -651,7 +651,7 @@ class TestDiffShape(Sandbox):
     def test_a_diff_git_did_not_shape_as_asked_is_no_verdict(self):
         self.write("Sample.cs", self.DIRTY)
         self.commit("add a block")
-        shaped = gitio.changed_diff(self.tmp, self.base + "...HEAD")
+        shaped = gitio.changed_diff(self.tmp, (self.base + "...HEAD",))
         for unexpected in (shaped.replace("+++ b/", "+++ new/"), shaped.replace("+++ ", "\x1b[1m+++ "), ""):
             with mock.patch.object(gitio, "changed_diff", return_value=unexpected):
                 code, out, err = self.run_cli("--diff", self.base)
@@ -662,7 +662,7 @@ class TestDiffShape(Sandbox):
         self.write("Sample.cs", self.DIRTY)
         self.write("Other.cs", "public int Y;\n")
         self.commit("add a block and a file")
-        shaped = gitio.changed_diff(self.tmp, self.base + "...HEAD")
+        shaped = gitio.changed_diff(self.tmp, (self.base + "...HEAD",))
         moved = shaped.replace("+++ b/Sample.cs", "+++ b/Other.cs")
         with mock.patch.object(gitio, "changed_diff", return_value=moved):
             code, _out, err = self.run_cli("--diff", self.base)
