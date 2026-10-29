@@ -82,21 +82,29 @@ through Bash, on the lines changed since the session started and not yet committ
 
 `agent-comment-lint --hook --agent NAME` reads another agent's write event, with `NAME` one of `codex`, `windsurf` and
 `gemini`. The guard scripts in `integrations/guard/` run it and turn a missing command or any failure into exit 2, the
-code that blocks. No agent below has been seen blocking a write live, so none is listed as supported.
+code that blocks. No agent below has been seen blocking a write live, so none is listed as supported. These agents
+get no end-of-session check, so a file they write through their shell is never judged.
+
+Install the command first, as under [Command line](#command-line). Then copy the template and the guard scripts from
+the `v1.4.0` tag, so they match the installed version.
 
 Not yet verified. Each adapter is built from the agent's documentation:
 
-- Codex CLI: template `integrations/codex/hooks.json`. Copy it to `.codex/hooks.json` with the guard scripts, then trust
-  the hook with `/hooks`.
-- Windsurf/Devin: template `integrations/windsurf/hooks.json`. Copy it to `.devin/hooks.json` with the guard scripts.
+- Codex CLI: template `integrations/codex/hooks.json`. Copy it to `.codex/hooks.json` and the guard scripts to
+  `.codex/`, then trust the hook with `/hooks`.
+- Windsurf/Devin: template `integrations/windsurf/hooks.json`. Copy it to `.devin/hooks.json` and the guard scripts to
+  `.devin/`.
 - Gemini CLI: template `integrations/gemini/settings.json` (`settings.windows.json` on Windows). Merge its hooks into
-  `.gemini/settings.json` and copy the guard scripts to `.gemini/`.
+  `.gemini/settings.json` and copy the guard scripts to `.gemini/`. On Windows the POSIX form lets writes through,
+  and elsewhere the Windows form blocks every write, so a team that mixes systems must not commit the POSIX form for
+  everyone: each person sets the hook in their user-level settings instead. See [Gemini CLI](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#gemini-cli).
 
 No adapter yet, waiting for a captured event:
 
 - GitHub Copilot: the argument names of its write tools are undocumented.
 - Cursor: the `Write` tool's input shape is undocumented.
-- Kiro: the write tool's input shape is undocumented, and it differs between versions.
+- Kiro: the argument names of the V3 write tools are undocumented. The 2.x shape is known only from the source of its
+  predecessor, the Amazon Q Developer CLI.
 - Antigravity: its exit codes are undocumented, so how to block a write is unknown.
 
 To help with one, set `AGENT_COMMENT_LINT_CAPTURE` to a file and register `integrations/capture/capture-event.sh`

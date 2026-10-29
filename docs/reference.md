@@ -393,10 +393,18 @@ since. Both run the same wrapper and `--hook`, which dispatches on the event's `
 `--hook --agent NAME` reads the write event of another coding agent. `NAME` is `claude` (the default), `codex`,
 `windsurf` or `gemini`. `--agent` without `--hook` is a usage error. `--agent claude` behaves as `--hook` always has.
 The same rules judge the same changed lines, and a rejected write exits 2 with the same teaching report on stderr.
+These agents get no end-of-session check, so a file they write through their shell is never judged.
 
 Each adapter is built from the agent's documentation and has not been verified live: no agent has been seen blocking
 a write. Treat each as "not yet verified". Copilot, Cursor, Kiro and Antigravity have no adapter, because their
 write payloads, or for Antigravity its block channel, are undocumented. An owner capture is needed first.
+
+These hooks are a guardrail against careless comments, not a security boundary against an agent that sets out to
+switch them off: the guards and hook configs sit in folders the agent can write to, and Codex's `commandWindows` runs
+`git` through cmd's lookup, which searches the current directory first.
+
+Install the command first (`uv tool install agent-comment-lint==1.4.0` or `pipx install agent-comment-lint==1.4.0`),
+then copy the template and the guard scripts from the `v1.4.0` tag, so they match the installed version.
 
 ### The guard scripts
 
@@ -435,13 +443,15 @@ from the file avoid it.
   Codex loads a project's `.codex/` only for a trusted project, and records trust against the hook's hash, so a new
   or changed hook is skipped until it is trusted again. Keep the hook sync, with no `async: true`.
 - How the guard is found: Codex runs the hook in the session's cwd and sets no project variable. The template finds
-  the repository root with `git rev-parse --show-toplevel`, so a session in a subdirectory works. The POSIX login
-  shell must understand `$(...)`: sh, bash, zsh, or fish 3.4 or newer. Do not use a user-level `~/.codex/hooks.json`,
-  which would block every patch in a repository with no guard.
+  the repository root with `git rev-parse --show-toplevel`, so a session in a subdirectory works. Codex runs the
+  POSIX form in the user's login shell (`$SHELL -lc`), which works in sh, bash, zsh, and fish 3.4 or newer. With
+  any other login shell, such as pwsh or nushell, every patch goes through. Do not use a user-level
+  `~/.codex/hooks.json`, which would block every patch in a repository with no guard.
 - Block channel: exit 2 with the report on stderr. Codex blocks the call and gives the text to the model.
-- Crash and timeout: Codex has no fail-closed setting, so none is promised. A crash, a timeout (600 s by default), any
-  exit other than 0 or 2, or exit 2 with empty stderr lets the patch through. The guard always writes a reason. A
-  missing guard, a session outside a git work tree, or git missing from PATH exits 2 on both OS forms.
+- Crash and timeout: Codex has no fail-closed setting, so none is promised. A crash of Codex's hook runner, a timeout
+  (600 s by default), any exit other than 0 or 2, or exit 2 with empty stderr lets the patch through. The guard
+  always writes a reason. A missing guard, a session outside a git work tree, or git missing from PATH exits 2 on
+  both OS forms.
 - Known limits:
   - A patch sent as a shell command (`apply_patch <<'EOF'` through the shell tool) reaches hooks as `Bash` and is
     not judged. Codex calls hooks a guardrail, not a complete enforcement boundary.
@@ -462,7 +472,8 @@ from the file avoid it.
   The template has a POSIX `command` and a `powershell` form. The PowerShell form is unverified on Windows.
 - Block channel: exit 2, with stderr shown to the agent. There is no JSON channel. `show_output` also shows the
   output to the user in the Cascade panel.
-- Crash and timeout: a crash or any exit other than 2 lets the write through, on every OS. No timeout is documented.
+- Crash and timeout: a crash of Windsurf's hook runner, or any exit other than 2, lets the write through, on every
+  OS. The guard turns a failure of agent-comment-lint into 2. No timeout is documented.
 - Known limits:
   - A custom `working_directory`, or a user-level install, leaves the guard unfound, so every write is blocked.
   - The shape of a new-file write is a guess, and needs a capture.
@@ -488,6 +499,14 @@ from the file avoid it.
   - The template finds the guard through `GEMINI_PROJECT_DIR`, which may be the session's directory and not the
     project root. A session in a subdirectory without a guard there fails closed, and a user-level install would too.
   - Whether `file_path` is absolute is undocumented.
+  - One settings file holds one form, and each form fails on the other system. Gemini runs a hook through
+    PowerShell on Windows, where the POSIX form lets the write through: Windows PowerShell 5.1 cannot parse it
+    (exit 1, with a warning), and pwsh 7 exits 0, with no warning, when Git's `sh` is not on PATH, which is Git
+    for Windows' default. On macOS and Linux the Windows form fails to parse and blocks every write.
+  - So a team that mixes systems must not commit the POSIX form for everyone. Commit the guard scripts in
+    `.gemini/`, and let each person merge the form for their system into their user-level
+    `~/.gemini/settings.json`: the check is then set up per machine. That user-level hook blocks every write in a
+    project without the guards.
   - Windows uses `settings.windows.json`, which has not been run on Windows.
 
 ## Versions
