@@ -26,17 +26,23 @@ class TestChangedFiles(unittest.TestCase):
         output = (self.raw("M", "a.cs", same=False) + self.raw("M", "b.png", same=False)
                   + self.raw("R100", "old name.cs", "new name.cs")
                   + "3\t1\ta.cs\0-\t-\tb.png\x000\t0\t\0old name.cs\0new name.cs\0")
-        self.assertEqual(self.changes(output), {"a.cs": (3, False), "b.png": (None, False), "new name.cs": (0, True)})
+        self.assertEqual(self.changes(output), {"a.cs": (3, False, self.OTHER), "b.png": (None, False, self.OTHER),
+                                                "new name.cs": (0, True, self.SAME)})
 
     def test_a_mode_change_and_a_pure_rename_keep_their_content(self):
         output = (self.raw("M", "a.ts") + self.raw("R100", "old.ts", "new.ts") + self.raw("M", "b.ts", same=False)
                   + self.raw("R090", "c.ts", "d.ts", same=False)
                   + "-\t-\ta.ts\0-\t-\t\0old.ts\0new.ts\0-\t-\tb.ts\0-\t-\t\0c.ts\0d.ts\0")
-        self.assertEqual(self.changes(output), {"a.ts": (None, True), "new.ts": (None, True),
-                                                "b.ts": (None, False), "d.ts": (None, False)})
+        self.assertEqual(self.changes(output), {"a.ts": (None, True, self.SAME), "new.ts": (None, True, self.SAME),
+                                                "b.ts": (None, False, self.OTHER), "d.ts": (None, False, self.OTHER)})
 
     def test_no_output_is_no_changed_path(self):
         self.assertEqual(self.changes(""), {})
+
+    def test_a_count_with_no_record_of_its_blobs_is_a_git_failure(self):
+        with self.assertRaises(gitio.GitError) as caught:
+            self.changes(self.raw("M", "a.cs", same=False) + "3\t1\ta.cs\x001\t0\tb.cs\0")
+        self.assertTrue(str(caught.exception).startswith("git diff --raw printed a record"))
 
     def test_a_record_that_is_not_shaped_as_asked_is_a_git_failure_that_names_its_kind(self):
         numstat = ("3\t1", "three\t1\ta.cs\0", "1\t0\t\0", "1\t0\t\0old.cs")
@@ -168,3 +174,32 @@ class TestRepository(unittest.TestCase):
         self.commit()
         with self.assertRaises(gitio.GitError):
             gitio.blob(self.tmp, "HEAD:./missing.ts")
+
+    def blob_id(self, text):
+        self.write("x.bin", text)
+        return self.git("hash-object", "-w", "x.bin").strip()
+
+    def test_blobs_are_read_by_id_in_one_git_call(self):
+        first, second = self.blob_id(b"one\n\ntwo"), self.blob_id(b"\x00 bytes\n")
+        with mock.patch.object(gitio, "_git_bytes", wraps=gitio._git_bytes) as git:
+            blobs = gitio.read_blobs(self.tmp, [first, second, first])
+        self.assertEqual(blobs, {first: b"one\n\ntwo", second: b"\x00 bytes\n"})
+        self.assertEqual(git.call_count, 1)
+
+    def test_no_blob_needs_no_git_call(self):
+        with mock.patch.object(gitio, "_git_bytes", side_effect=AssertionError("git was asked")):
+            self.assertEqual(gitio.read_blobs(self.tmp, []), {})
+
+    def test_an_id_that_names_no_object_is_a_git_error(self):
+        present, missing = self.blob_id(b"one\n"), "0" * 39 + "1"
+        with self.assertRaises(gitio.GitError) as caught:
+            gitio.read_blobs(self.tmp, [present, missing])
+        self.assertIn(missing, str(caught.exception))
+
+    def test_an_answer_not_shaped_as_asked_is_a_git_error(self):
+        oid = self.blob_id(b"one\n")
+        header = oid.encode()
+        for answer in (b"", header + b" blob\n", header + b" blob 9\none\n", header + b" tree 4\none\n\n"):
+            with mock.patch.object(gitio, "_git_bytes", return_value=answer):
+                with self.assertRaises(gitio.GitError, msg=answer):
+                    gitio.read_blobs(self.tmp, [oid])

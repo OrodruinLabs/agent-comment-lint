@@ -171,13 +171,6 @@ def _read(root, path, errors, newline=None):
         return handle.read()
 
 
-def _blob_reader(spec_prefix):
-    """A reader of git blobs named `spec_prefix + path`; unlike `_read` it decodes strictly, so bad UTF-8 blocks."""
-    def read(root, path, errors):
-        return gitio.blob(root, spec_prefix + path).decode(ENCODING)
-    return read
-
-
 def _stdin_text(stdin, errors="replace"):
     """Standard input decoded as a file is, whatever the locale; a stream with no bytes behind it is taken as text."""
     raw = getattr(stdin, "buffer", None)
@@ -214,17 +207,22 @@ class _Run:
         self.unresolved += result.unresolved_lines
         self.findings.extend((path, finding) for finding in found)
 
-    def judge_file(self, root, path, ranges=None, errors="replace", read=None):
+    def judge_file(self, root, path, ranges=None, errors="replace"):
         try:
-            text = (read or _read)(root, path, errors)
+            text = _read(root, path, errors)
         except UnicodeDecodeError:
             self.errors.append((path, None, BINARY_NOT_TEXT))
             return
         except OSError as error:
             self.errors.append((path, None, error.strerror or str(error)))
             return
-        except gitio.GitError as error:
-            self.errors.append((path, None, str(error)))
+        self.judge(path, text, ranges)
+
+    def judge_blob(self, path, data, ranges):
+        try:
+            text = data.decode(ENCODING)
+        except UnicodeDecodeError:
+            self.errors.append((path, None, BINARY_NOT_TEXT))
             return
         self.judge(path, text, ranges)
 
@@ -243,26 +241,64 @@ def _run_all(run, root, config, listed_by_git):
 
 
 def _run_diff(run, root, config, base):
-    _run_changes(run, root, config, gitio.diff_span(root, base), _read)
+    _run_changes(run, root, config, gitio.diff_span(root, base))
 
 
-def _run_changes(run, root, config, span, read):
-    """Judge the changed lines; a file whose parsed ranges do not add up to git's own count is refused, not passed."""
+def _changed_ranges(run, root, config, span):
+    """{path: (blob id, ranges)} for the judged files the span changes; a file whose ranges do not add up is refused."""
     ranges = parse_diff_ranges(gitio.changed_diff(root, span))
-    for path, (added, same_content) in gitio.changed_files(root, span).items():
+    found = {}
+    for path, (added, same_content, blob) in gitio.changed_files(root, span).items():
         if same_content or not _judged(config, path):
             # A mode change or a pure rename changes no line, so the file is not read, whatever it holds.
             continue
         if added is None:
             # Git prints no lines for a file it treats as binary, so every line of it counts as changed.
-            run.judge_file(root, path, errors="strict", read=read)
+            found[path] = (blob, None)
             continue
         spans = ranges.get(path, [])
         parsed = sum(end - start + 1 for start, end in spans)
         if parsed != added:
             run.errors.append((path, None, DIFF_MISMATCH % (added, parsed)))
             continue
-        run.judge_file(root, path, spans, read=read)
+        found[path] = (blob, spans)
+    return found
+
+
+def _overlap(ranges, other):
+    """The lines two ordered lists of ranges share; None, for a file git calls binary, stands for every line."""
+    if ranges is None or other is None:
+        return other if ranges is None else ranges
+    shared, mine, theirs = [], 0, 0
+    while mine < len(ranges) and theirs < len(other):
+        start, end = max(ranges[mine][0], other[theirs][0]), min(ranges[mine][1], other[theirs][1])
+        if start <= end:
+            shared.append((start, end))
+        if ranges[mine][1] < other[theirs][1]:
+            mine += 1
+        else:
+            theirs += 1
+    return shared
+
+
+def _run_changes(run, root, config, span, from_blobs=False, also=None):
+    """Judge the lines the span changes, from disk or from git's blobs; with `also`, only lines both spans change."""
+    changed = _changed_ranges(run, root, config, span)
+    if also is not None:
+        other = _changed_ranges(run, root, config, also)
+        changed = {path: (blob, _overlap(ranges, other[path][1]))
+                   for path, (blob, ranges) in changed.items() if path in other}
+    if not from_blobs:
+        for path, (_blob, ranges) in changed.items():
+            run.judge_file(root, path, ranges, errors="strict" if ranges is None else "replace")
+        return
+    try:
+        blobs = gitio.read_blobs(root, [blob for blob, _ranges in changed.values()])
+    except gitio.GitError as error:
+        run.errors.extend((path, None, str(error)) for path in changed)
+        return
+    for path, (blob, ranges) in changed.items():
+        run.judge_blob(path, blobs[blob], ranges)
 
 
 def _named(run, root, cwd, config, path):
@@ -328,7 +364,7 @@ def _record_session(root, load_config, event):
 
 
 def _run_session_end(run, root, load_config, event):
-    """Judge the covered files that changed since the session's snapshot, on the lines that changed."""
+    """Judge the covered files changed since the session's snapshot, on the changed lines not yet committed."""
     run.event = "Stop"
     if _work_tree(root, "all") is None:
         return
@@ -341,7 +377,9 @@ def _run_session_end(run, root, load_config, event):
     config = load_config(root)
     run.governance = config.governance
     now = gitio.snapshot_tree(root, _covered_paths(root, config))
-    _run_changes(run, root, config, (before, now), _blob_reader(now + ":./"))
+    # A line HEAD holds came from a commit, a checkout, a pull or a reset, by anyone; pre-commit and CI judge those.
+    head = ("HEAD", now) if gitio.has_head(root) else None
+    _run_changes(run, root, config, (before, now), from_blobs=True, also=head)
 
 
 def _run_hook(run, root, cwd, load_config, stdin, follow_worktrees):
@@ -416,7 +454,7 @@ def _execute(args, cwd, stdin):
             for relative in dict.fromkeys(path for path in named if path is not None):
                 run.judge_file(root, relative)
         elif run.mode == "staged":
-            _run_changes(run, root, config, gitio.STAGED_SPAN, _blob_reader(":./"))
+            _run_changes(run, root, config, gitio.STAGED_SPAN, from_blobs=True)
         else:
             relative = _named(run, root, cwd, config, args.stdin_path)
             if relative is not None:

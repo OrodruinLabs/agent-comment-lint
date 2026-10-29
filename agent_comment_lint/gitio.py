@@ -92,8 +92,9 @@ def diff_span(root, base):
 STAGED_SPAN = ("--cached",)
 
 
-Change = namedtuple("Change", ["added", "same_content"])
-Change.__doc__ = "One changed file: lines added (None for a file git calls binary), and whether its blob is unchanged."
+Change = namedtuple("Change", ["added", "same_content", "blob"])
+Change.__doc__ = ("One changed file: lines added (None for a file git calls binary), whether its blob is unchanged, "
+                  "and the id of its new blob.")
 
 
 UNREADABLE = "git diff %s printed a record that cannot be read, so the changed %s unknown"
@@ -103,6 +104,7 @@ RECORD_KINDS = {True: ("--raw", "files are"), False: ("--numstat", "lines are")}
 def _changed_files(text):
     """{path: Change} from `--raw --numstat -z` output; a rename record carries its two names in the next two fields."""
     fields = iter(text.split("\0"))
+    blobs = {}
     same_content = set()
     added = {}
     for field in fields:
@@ -115,6 +117,7 @@ def _changed_files(text):
                 path = next(fields)
                 if status[:1] in ("R", "C"):
                     path = next(fields)
+                blobs[path] = new_blob
                 if old_blob == new_blob:
                     same_content.add(path)
                 continue
@@ -125,7 +128,9 @@ def _changed_files(text):
             added[path] = None if count == "-" else int(count)
         except (ValueError, StopIteration):
             raise GitError(UNREADABLE % RECORD_KINDS[raw])
-    return {path: Change(count, path in same_content) for path, count in added.items()}
+    if not set(added) <= set(blobs):
+        raise GitError(UNREADABLE % RECORD_KINDS[True])
+    return {path: Change(count, path in same_content, blobs[path]) for path, count in added.items()}
 
 
 def changed_files(root, span):
@@ -175,6 +180,34 @@ def snapshot_tree(root, paths):
 def blob(root, spec):
     """The bytes of the blob `spec` names; GitError when it names none."""
     return _git_bytes(root, "cat-file", "blob", spec)
+
+
+BATCH_UNREADABLE = "git cat-file --batch printed a record that cannot be read"
+
+
+def read_blobs(root, ids):
+    """{id: bytes} for each blob id, all read by one `git cat-file --batch`; GitError when one names no blob."""
+    wanted = list(dict.fromkeys(ids))
+    if not wanted:
+        return {}
+    out = _git_bytes(root, "cat-file", "--batch", input="".join(oid + "\n" for oid in wanted).encode("ascii"))
+    blobs = {}
+    position = 0
+    try:
+        for oid in wanted:
+            end = out.index(b"\n", position)
+            header = out[position:end].decode("ascii").split(" ")
+            if header == [oid, "missing"]:
+                raise GitError("git cat-file --batch found no object %s" % oid)
+            name, kind, size = header
+            start, stop = end + 1, end + 1 + int(size)
+            if (name, kind) != (oid, "blob") or out[stop:stop + 1] != b"\n":
+                raise GitError(BATCH_UNREADABLE)
+            blobs[oid] = out[start:stop]
+            position = stop + 1
+    except ValueError:
+        raise GitError(BATCH_UNREADABLE)
+    return blobs
 
 
 def has_head(root):

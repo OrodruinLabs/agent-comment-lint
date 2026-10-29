@@ -623,11 +623,24 @@ class TestStagedMode(Sandbox):
         self.assertEqual(code, 1)
         self.assertIn("a.ts:2: C1:", out)
 
-    def test_a_blob_that_cannot_be_read_is_exit_2(self):
+    def test_a_blob_that_cannot_be_read_is_exit_2_and_names_the_file(self):
         self.write("a.ts", "// one\n// two\n")
         self.git("add", "a.ts")
-        with mock.patch.object(cli.gitio, "blob", side_effect=cli.gitio.GitError("no blob")):
-            self.assertEqual(self.run_cli("--staged")[0], 2)
+        with mock.patch.object(cli.gitio, "read_blobs", side_effect=cli.gitio.GitError("no blob")):
+            code, out, err = self.run_cli("--staged")
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("a.ts: could not scan: no blob", err)
+
+    def test_the_blobs_are_read_in_a_number_of_git_calls_that_does_not_grow_with_the_files(self):
+        def git_calls(count):
+            for index in range(count):
+                self.write("f%d.ts" % index, "// one\n// two\n")
+            self.git("add", "-A")
+            with mock.patch.object(gitio, "_git_bytes", wraps=gitio._git_bytes) as git:
+                self.assertEqual(self.run_cli("--staged")[0], 1)
+            return git.call_count
+
+        self.assertEqual(git_calls(1), git_calls(30))
 
 
 class TestStagedModeOutsideGit(Sandbox):
@@ -1373,6 +1386,89 @@ class TestSessionHooks(Sandbox):
     def test_an_event_that_is_not_an_object_or_has_no_string_name_is_refused(self):
         self.assertEqual(self.hook("[]")[0], 2)
         self.assertEqual(self.hook(json.dumps({"hook_event_name": 3}))[0], 2)
+
+    def test_the_blobs_are_read_in_a_number_of_git_calls_that_does_not_grow_with_the_files(self):
+        self.start()
+
+        def git_calls(count):
+            for index in range(count):
+                self.write("f%d.ts" % index, "// one\n// two\n")
+            with mock.patch.object(gitio, "_git_bytes", wraps=gitio._git_bytes) as git:
+                self.assertEqual(self.stop()[0], 2)
+            return git.call_count
+
+        self.assertEqual(git_calls(1), git_calls(30))
+
+
+class TestSessionHooksAgainstHead(Sandbox):
+    """Stop judges only lines changed since the session started and not yet committed, so a moved HEAD adds none."""
+
+    OLD = "// one\n// two\nconst a = 1;\n"
+
+    def setUp(self):
+        super().setUp()
+        self.init_repo()
+        self.write("a.ts", "const a = 1;\n")
+        self.commit("clean")
+
+    def hook(self, name):
+        return self.run_cli("--hook", stdin=session_event(name))
+
+    def start(self):
+        self.assertEqual(self.hook("SessionStart"), (0, "", ""))
+
+    def branch_with_old_comments(self, name):
+        self.git("checkout", "-q", "-b", name)
+        self.write("a.ts", self.OLD)
+        self.write("old.ts", self.OLD)
+        self.commit("old comments")
+        self.git("checkout", "-q", "-")
+
+    def test_checking_out_a_branch_with_old_comments_does_not_block(self):
+        self.branch_with_old_comments("release")
+        self.start()
+        self.git("checkout", "-q", "release")
+        self.assertEqual(self.hook("Stop"), (0, "", ""))
+
+    def test_a_hard_reset_to_an_older_commit_with_old_comments_does_not_block(self):
+        self.write("a.ts", self.OLD)
+        old = self.commit("old comments")
+        self.write("a.ts", "const a = 1;\n")
+        self.commit("clean them")
+        self.start()
+        self.git("reset", "-q", "--hard", old)
+        self.assertEqual(self.hook("Stop"), (0, "", ""))
+
+    def test_a_fast_forward_merge_of_old_comments_does_not_block(self):
+        self.branch_with_old_comments("feature")
+        self.start()
+        self.git("merge", "-q", "--ff-only", "feature")
+        self.assertEqual(self.hook("Stop"), (0, "", ""))
+
+    def test_a_violation_written_after_a_checkout_still_blocks(self):
+        self.branch_with_old_comments("release")
+        self.start()
+        self.git("checkout", "-q", "release")
+        self.write("old.ts", self.OLD + "// three\n// four\n")
+        code, _out, err = self.hook("Stop")
+        self.assertEqual(code, 2)
+        self.assertIn("old.ts:4: C1:", err)
+        self.assertNotIn("old.ts:1:", err)
+        self.assertNotIn("a.ts:1:", err)
+
+    def test_a_violation_the_session_commits_is_left_to_pre_commit_and_ci(self):
+        self.start()
+        self.write("b.ts", self.OLD)
+        self.commit("the session commits its own violation")
+        self.assertEqual(self.hook("Stop"), (0, "", ""))
+
+    def test_a_line_the_session_reverts_to_its_committed_text_is_not_judged(self):
+        self.write("a.ts", "// one\n// two\nconst a = 1;\n")
+        self.commit("an old block")
+        self.write("a.ts", "// one\nconst b = 0;\nconst a = 1;\n")
+        self.start()
+        self.write("a.ts", "// one\n// two\nconst a = 2;\n")
+        self.assertEqual(self.hook("Stop"), (0, "", ""))
 
 
 class TestSessionHooksBeforeTheFirstCommit(Sandbox):
