@@ -61,6 +61,29 @@ The numbers skip because C2, C4 and C6 need a compiler or human judgment, and th
 JSX and TSX are included. Other files are skipped, and so are dependency and build folders such as
 `node_modules`, `dist` and `.venv`. Each language's comment styles are listed in [the reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#scope).
 
+## Supported agents
+
+<div align="center">
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/claude-color.svg" width="44" height="44" alt=""><br><b>Claude Code</b><br><sub>Supported</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/codex-color.svg" width="44" height="44" alt=""><br><b>Codex CLI</b><br><sub>Preview</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/windsurf/0B100F/FFFFFF" width="44" height="44" alt=""><br><b>Windsurf / Devin</b><br><sub>Preview</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/gemini-color.svg" width="44" height="44" alt=""><br><b>Gemini CLI</b><br><sub>Preview</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/copilot-color.svg" width="44" height="44" alt=""><br><b>GitHub Copilot</b><br><sub>Planned</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/cursor/000000/FFFFFF" width="44" height="44" alt=""><br><b>Cursor</b><br><sub>Planned</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/kiro-color.svg" width="44" height="44" alt=""><br><b>Kiro</b><br><sub>Planned</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/antigravity-color.svg" width="44" height="44" alt=""><br><b>Antigravity</b><br><sub>Planned</sub></td>
+  </tr>
+</table>
+</div>
+
+**Preview** adapters are built from the agent's hook documentation and have not yet been seen blocking a write live.
+**Planned** agents wait for one captured hook event, because their docs do not say what a file write looks like.
+The details for each agent are in [the reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#other-coding-agents).
+
 ## Setup
 
 Pick where it runs; every channel runs the same check. The snippets pin `v1.4.0`. Keep a pin, so a new release never
@@ -80,36 +103,9 @@ through Bash, on the lines changed since the session started and not yet committ
 
 ### Other coding agents
 
-`agent-comment-lint --hook --agent NAME` reads another agent's write event, with `NAME` one of `codex`, `windsurf` and
-`gemini`. The guard scripts in `integrations/guard/` run it and turn a missing command or any failure into exit 2, the
-code that blocks. No agent below has been seen blocking a write live, so none is listed as supported. These agents
-get no end-of-session check, so a file they write through their shell is never judged.
-
-Install the command first, as under [Command line](#command-line). Then copy the template and the guard scripts from
-the `v1.4.0` tag, so they match the installed version.
-
-Not yet verified. Each adapter is built from the agent's documentation:
-
-- Codex CLI: template `integrations/codex/hooks.json`. Copy it to `.codex/hooks.json` and the guard scripts to
-  `.codex/`, then trust the hook with `/hooks`.
-- Windsurf/Devin: template `integrations/windsurf/hooks.json`. Copy it to `.devin/hooks.json` and the guard scripts to
-  `.devin/`.
-- Gemini CLI: template `integrations/gemini/settings.json` (`settings.windows.json` on Windows). Merge its hooks into
-  `.gemini/settings.json` and copy the guard scripts to `.gemini/`. On Windows the POSIX form lets writes through,
-  and elsewhere the Windows form blocks every write, so a team that mixes systems must not commit the POSIX form for
-  everyone: each person sets the hook in their user-level settings instead. See [Gemini CLI](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#gemini-cli).
-
-No adapter yet, waiting for a captured event:
-
-- GitHub Copilot: the argument names of its write tools are undocumented.
-- Cursor: the `Write` tool's input shape is undocumented.
-- Kiro: the argument names of the V3 write tools are undocumented. The 2.x shape is known only from the source of its
-  predecessor, the Amazon Q Developer CLI.
-- Antigravity: its exit codes are undocumented, so how to block a write is unknown.
-
-To help with one, set `AGENT_COMMENT_LINT_CAPTURE` to a file and register `integrations/capture/capture-event.sh`
-(`.cmd` on Windows) as the agent's hook. It appends each event to that file and never blocks.
-Details for each adapter are in [the reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#other-coding-agents).
+For Codex CLI, Windsurf / Devin and Gemini CLI, install the command as under [Command line](#command-line), then copy
+the agent's template from `integrations/` and the guard scripts at the `v1.4.0` tag. The steps for each agent are in
+[the reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#other-coding-agents).
 
 ### GitHub Actions
 
