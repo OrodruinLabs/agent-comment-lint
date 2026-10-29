@@ -117,6 +117,53 @@ class TestAction(unittest.TestCase):
         self.assertIn("::remove-matcher owner=agent-comment-lint::", text)
         self.assertIn("GITHUB_STEP_SUMMARY", text)
 
+    def action_block(self):
+        with open(os.path.join(REPO, "action.yml"), encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+        start = next(i for i, line in enumerate(lines) if line.strip() == "run: |") + 1
+        block = []
+        for line in lines[start:]:
+            if line.strip() and not line.startswith(" " * 8):
+                break
+            block.append(line[8:])
+        return "\n".join(block) + "\n"
+
+    def run_action(self, repo, summary, base):
+        env = dict(os.environ, GITHUB_ACTION_PATH=REPO, GITHUB_STEP_SUMMARY=summary, MODE="diff", BASE=base,
+                   ARGS="", TARGET="")
+        command = ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", self.action_block()]
+        return subprocess.run(command, cwd=repo, env=env, capture_output=True, text=True, encoding="utf-8")
+
+    @unittest.skipUnless(shutil.which("bash") and shutil.which("git"), "needs bash and git")
+    def test_the_action_prints_findings_and_removes_the_matcher_under_bash_e(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = os.path.join(tmp, "repo")
+            os.mkdir(repo)
+
+            def git(*args):
+                return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=repo,
+                                      check=True, capture_output=True, text=True).stdout.strip()
+
+            git("init", "-q")
+            with open(os.path.join(repo, "a.ts"), "w", encoding="utf-8", newline="\n") as handle:
+                handle.write("const a = 1;\n")
+            git("add", ".")
+            git("commit", "-qm", "base")
+            base = git("rev-parse", "HEAD")
+            with open(os.path.join(repo, "a.ts"), "w", encoding="utf-8", newline="\n") as handle:
+                handle.write("// one\n// two\nconst a = 1;\n")
+            git("commit", "-qam", "dirty")
+            summary = os.path.join(tmp, "summary.md")
+            done = self.run_action(repo, summary, base)
+            self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+            self.assertIn("a.ts:1: C1:", done.stdout)
+            self.assertIn("::remove-matcher owner=agent-comment-lint::", done.stdout)
+            with open(summary, encoding="utf-8") as handle:
+                self.assertIn("a.ts:1: C1:", handle.read())
+            missing = self.run_action(repo, summary, "")
+            self.assertEqual(missing.returncode, 2, missing.stdout + missing.stderr)
+            self.assertNotIn("::add-matcher::", missing.stdout)
+
 
 class TestRelease(unittest.TestCase):
     def test_a_release_publishes_to_pypi_through_trusted_publishing(self):

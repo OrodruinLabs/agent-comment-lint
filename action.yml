@@ -35,10 +35,9 @@ runs:
             set -- --diff "$base" ;;
           *) echo "agent-comment-lint: mode must be diff or all, not $MODE" >&2; exit 2 ;;
         esac
-        out=$(mktemp)
+        out=$(mktemp) || { echo "agent-comment-lint: cannot create a temporary file" >&2; exit 2; }
         echo "::add-matcher::$GITHUB_ACTION_PATH/.github/problem-matcher.json"
-        "$py" "$script" "$@" $ARGS >"$out" 2>&1
-        code=$?
+        code=0; "$py" "$script" "$@" $ARGS >"$out" 2>&1 || code=$?
         cat "$out"
         if [ "$code" -ne 0 ] && [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
           { echo '```'; cat "$out"; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
