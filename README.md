@@ -102,10 +102,11 @@ repos:
   - repo: https://github.com/OrodruinLabs/agent-comment-lint
     rev: v1.2.0
     hooks:
-      - id: agent-comment-lint
+      - id: agent-comment-lint-staged
 ```
 
-This checks each staged file whole, not only its changed lines, so fix or exclude old findings before you turn it on.
+This checks only the lines you stage, as the index holds them, so a repository with old findings can turn it on today.
+To judge each staged file whole instead, use `id: agent-comment-lint`, and fix or exclude old findings first.
 
 ### Command line
 

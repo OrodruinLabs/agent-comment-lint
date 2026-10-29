@@ -570,6 +570,71 @@ class TestDiffMode(Sandbox):
         self.assertEqual(self.run_cli("--diff", base)[:2], (0, "agent-comment-lint: clean, 0 file(s) scanned.\n"))
 
 
+class TestStagedMode(Sandbox):
+    def setUp(self):
+        super().setUp()
+        self.init_repo()
+
+    def test_only_staged_new_lines_are_judged(self):
+        self.write("a.ts", "// one\n// two\nconst a = 1;\n")
+        self.commit("old findings")
+        self.write("a.ts", "// one\n// two\nconst a = 1;\n// three\n// four\n")
+        self.git("add", "a.ts")
+        code, out, _err = self.run_cli("--staged")
+        self.assertEqual(code, 1)
+        self.assertIn("a.ts:4: C1:", out)
+        self.assertNotIn("a.ts:1:", out)
+
+    def test_an_unstaged_violation_is_not_judged(self):
+        self.write("a.ts", "const a = 1;\n")
+        self.commit("clean")
+        self.write("a.ts", "const a = 2;\n")
+        self.git("add", "a.ts")
+        self.write("a.ts", "// one\n// two\nconst a = 2;\n")
+        self.assertEqual(self.run_cli("--staged")[0], 0)
+
+    def test_before_the_first_commit_every_staged_line_is_judged(self):
+        self.write("a.ts", "// one\n// two\n")
+        self.git("add", "a.ts")
+        self.assertEqual(self.run_cli("--staged")[0], 1)
+
+    def test_a_staged_file_that_is_not_utf_8_cannot_be_scanned(self):
+        self.write_bytes("a.ts", b"// caf\xe9\n")
+        self.git("add", "a.ts")
+        self.assertEqual(self.run_cli("--staged")[0], 2)
+
+    def test_a_staged_binary_file_that_is_not_utf_8_cannot_be_scanned(self):
+        self.write_bytes("a.ts", b"// caf\xe9\x00\n")
+        self.git("add", "a.ts")
+        self.assertEqual(self.run_cli("--staged")[0], 2)
+
+    def test_nothing_staged_is_clean(self):
+        self.write("a.ts", "const a = 1;\n")
+        self.commit("clean")
+        self.assertEqual(self.run_cli("--staged"), (0, CLEAN_NONE, ""))
+
+    def test_a_root_below_the_top_level_reads_its_own_file_from_the_index(self):
+        self.write("a.ts", "// one\n// two\n")
+        self.write("sub/a.ts", "const a = 1;\n")
+        self.commit("base")
+        self.write("sub/a.ts", "const a = 1;\n// three\n// four\n")
+        self.git("add", "sub/a.ts")
+        code, out, _err = self.run_cli("--staged", "--root", "sub")
+        self.assertEqual(code, 1)
+        self.assertIn("a.ts:2: C1:", out)
+
+    def test_a_blob_that_cannot_be_read_is_exit_2(self):
+        self.write("a.ts", "// one\n// two\n")
+        self.git("add", "a.ts")
+        with mock.patch.object(cli.gitio, "blob", side_effect=cli.gitio.GitError("no blob")):
+            self.assertEqual(self.run_cli("--staged")[0], 2)
+
+
+class TestStagedModeOutsideGit(Sandbox):
+    def test_staged_needs_a_repository(self):
+        self.assertEqual(self.run_cli("--staged")[0], 2)
+
+
 class TestDiffShape(Sandbox):
     """Git settings and source lines that reshape the diff must not turn a finding into a clean run."""
 

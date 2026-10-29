@@ -73,8 +73,10 @@ which runs with `-o pipefail`, so a "could not scan" exit 2 is not hidden by rev
 
 ### pre-commit
 
-The hook works with pre-commit and prek. It judges the whole of each staged file, not only its changed lines. A
-repository with old findings fixes them, or excludes their paths, before it turns the hook on.
+The hook works with pre-commit and prek. It has two ids. `agent-comment-lint-staged` judges only the lines staged for
+the commit, read from the index, so a partly staged file is judged as it will be committed; it suits a repository with
+old findings. `agent-comment-lint` judges the whole of each staged file. A repository that uses it fixes its old
+findings, or excludes their paths, before it turns the hook on.
 
 ## The rules
 
@@ -148,6 +150,7 @@ standard input that is not UTF-8 instead of replacing the bytes it cannot read.
 
 ```
 agent-comment-lint --diff origin/main    # only what the branch changes
+agent-comment-lint --staged              # only the lines staged for the next commit
 agent-comment-lint --all                 # every covered file in the repository
 agent-comment-lint --files a.ts b.py     # the named files
 agent-comment-lint --stdin-path a.ts     # the text on standard input, judged as a.ts
@@ -161,6 +164,7 @@ Without an install, `python3 check-agent-comment-lint.py` from a checkout takes 
 | Mode | What it judges |
 | --- | --- |
 | `--diff BASE` | Files changed by the commits since the merge base with `BASE`. A finding is reported when its lines overlap a changed line, so a block that grows is reported from its first line. A renamed file is judged on its changed lines only. A changed file that git treats as binary (a `-diff` attribute, a NUL byte) has no changed lines to read, so the whole file is judged: every line of it counts as changed. A file whose content did not change, because only its mode or its name changed, is not read at all, whether git treats it as text or as binary. Only committed changes count: commit before you run it. |
+| `--staged` | The lines staged for the next commit, with the text read from the index, so a partly staged file is judged as it will be committed. Unstaged edits are ignored. Before the first commit every staged line counts. Selection, binary files and the line count check work as in `--diff`; a staged file that is not UTF-8 text cannot be judged, and is not passed. |
 | `--all` | Tracked files and new files that are not ignored, as git lists them. Outside a repository it walks the directory instead. Finding no covered file is exit code 2, not a clean run. |
 | `--files` | The files named. A named file that is out of scope or excluded is not judged. Needs no git. |
 | `--stdin-path` | A proposed file body, for an editor or write-time hook. The file on disk is not read. A fragment of a file may not lex; exit code 2 then means "no verdict", and the hook decides what to do with it. Needs no git. |
@@ -174,7 +178,7 @@ file, a repository git refuses to read):
 
 | Mode | When git cannot answer |
 | --- | --- |
-| `--diff` | Exit code 2, always. There are no changed lines without git. |
+| `--diff`, `--staged` | Exit code 2, always. There are no changed lines without git. |
 | `--all` | Exit code 2 where a `.git` entry in the directory or a parent, or `GIT_DIR`, claims a repository. The tree is not walked instead. Where nothing claims one, the directory is walked. |
 | `--files`, `--stdin-path`, `--hook` | A verdict all the same. The root is the working directory, or `--root`, so paths are reported from there and the settings file is looked for there. With `--root`, git is not asked at all. |
 
@@ -213,11 +217,12 @@ Exit code 2 is never downgraded. These are exit code 2, each with a message that
   not add up, the file is not passed as "no changed lines".
 - `--diff` when a changed file that git treats as binary is not UTF-8 text, such as a UTF-16 source file, and its
   content changed. It cannot be judged, and it is not passed.
+- `--staged` when a staged file is not UTF-8 text, or its blob cannot be read from the index.
 - `--diff` when git fails, or when its count of added lines or its list of changed files cannot be read.
 - `--all` in a repository that git cannot read or without a git program. The tree is not walked instead.
 - `--all` that finds no covered file. A mistyped root or an empty checkout must not pass a gate.
 
-`--diff`, `--files` and `--stdin-path` may judge no file and exit 0: a change can touch no covered file.
+`--diff`, `--staged`, `--files` and `--stdin-path` may judge no file and exit 0: a change can touch no covered file.
 
 ## Per-repository settings
 

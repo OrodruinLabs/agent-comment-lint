@@ -31,6 +31,8 @@ def _parser():
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--diff", metavar="BASE",
                       help="judge only the lines changed since the merge base with BASE")
+    mode.add_argument("--staged", action="store_true",
+                      help="judge only the lines staged for the next commit, as the index holds them")
     mode.add_argument("--all", action="store_true", help="judge every covered file in the repository")
     mode.add_argument("--files", nargs="+", metavar="PATH", help="judge the named files")
     mode.add_argument("--stdin-path", metavar="PATH",
@@ -59,6 +61,8 @@ def _mode(args):
         return "hook"
     if args.all:
         return "all"
+    if args.staged:
+        return "staged"
     for name in ("diff", "files"):
         if getattr(args, name) is not None:
             return name
@@ -70,7 +74,7 @@ def _work_tree(directory, mode):
     try:
         return gitio.toplevel(directory)
     except gitio.GitError:
-        if mode == "diff" or (mode == "all" and gitio.claims_repository(directory)):
+        if mode in ("diff", "staged") or (mode == "all" and gitio.claims_repository(directory)):
             raise
         return None
 
@@ -144,6 +148,13 @@ def _read(root, path, errors, newline=None):
         return handle.read()
 
 
+def _blob_reader(spec_prefix):
+    """A reader of git blobs named `spec_prefix + path`; unlike `_read` it decodes strictly, so bad UTF-8 blocks."""
+    def read(root, path, errors):
+        return gitio.blob(root, spec_prefix + path).decode(ENCODING)
+    return read
+
+
 def _stdin_text(stdin, errors="replace"):
     """Standard input decoded as a file is, whatever the locale; a stream with no bytes behind it is taken as text."""
     raw = getattr(stdin, "buffer", None)
@@ -179,14 +190,17 @@ class _Run:
         self.unresolved += result.unresolved_lines
         self.findings.extend((path, finding) for finding in found)
 
-    def judge_file(self, root, path, ranges=None, errors="replace"):
+    def judge_file(self, root, path, ranges=None, errors="replace", read=None):
         try:
-            text = _read(root, path, errors)
+            text = (read or _read)(root, path, errors)
         except UnicodeDecodeError:
             self.errors.append((path, None, BINARY_NOT_TEXT))
             return
         except OSError as error:
             self.errors.append((path, None, error.strerror or str(error)))
+            return
+        except gitio.GitError as error:
+            self.errors.append((path, None, str(error)))
             return
         self.judge(path, text, ranges)
 
@@ -205,8 +219,11 @@ def _run_all(run, root, config, listed_by_git):
 
 
 def _run_diff(run, root, config, base):
+    _run_changes(run, root, config, gitio.diff_span(root, base), _read)
+
+
+def _run_changes(run, root, config, span, read):
     """Judge the changed lines; a file whose parsed ranges do not add up to git's own count is refused, not passed."""
-    span = gitio.diff_span(root, base)
     ranges = parse_diff_ranges(gitio.changed_diff(root, span))
     for path, (added, same_content) in gitio.changed_files(root, span).items():
         if same_content or not _judged(config, path):
@@ -214,14 +231,14 @@ def _run_diff(run, root, config, base):
             continue
         if added is None:
             # Git prints no lines for a file it treats as binary, so every line of it counts as changed.
-            run.judge_file(root, path, errors="strict")
+            run.judge_file(root, path, errors="strict", read=read)
             continue
         spans = ranges.get(path, [])
         parsed = sum(end - start + 1 for start, end in spans)
         if parsed != added:
             run.errors.append((path, None, DIFF_MISMATCH % (added, parsed)))
             continue
-        run.judge_file(root, path, spans)
+        run.judge_file(root, path, spans, read=read)
 
 
 def _named(run, root, cwd, config, path):
@@ -321,6 +338,8 @@ def _execute(args, cwd, stdin):
             named = [_named(run, root, cwd, config, path) for path in args.files]
             for relative in dict.fromkeys(path for path in named if path is not None):
                 run.judge_file(root, relative)
+        elif run.mode == "staged":
+            _run_changes(run, root, config, gitio.STAGED_SPAN, _blob_reader(":./"))
         else:
             relative = _named(run, root, cwd, config, args.stdin_path)
             if relative is not None:

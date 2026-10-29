@@ -236,6 +236,18 @@ class TestRelease(unittest.TestCase):
             self.assertIn(expected, text)
 
 
+class TestPreCommitHooks(unittest.TestCase):
+    def test_the_staged_id_judges_only_staged_lines_and_matches_the_whole_file_id_on_files(self):
+        with open(os.path.join(REPO, ".pre-commit-hooks.yaml"), encoding="utf-8") as handle:
+            text = handle.read()
+        for expected in ("- id: agent-comment-lint-staged", "entry: agent-comment-lint --staged",
+                         "pass_filenames: false"):
+            self.assertIn(expected, text)
+        patterns = re.findall(r"^  files: .*$", text, re.MULTILINE)
+        self.assertEqual(len(patterns), 2)
+        self.assertEqual(patterns[0], patterns[1])
+
+
 class TestSchema(unittest.TestCase):
     def test_the_schema_names_exactly_the_packs_the_code_knows(self):
         schema = load("schema", "agent-comment-lint.schema.json")
