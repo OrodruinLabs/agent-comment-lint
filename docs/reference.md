@@ -346,16 +346,24 @@ governance list are the policy. There is no inline suppression.
   judged as a trailing comment. It starts at the first `//` that follows a space or a tab outside a quoted argument
   (`"..."` or a backtick string), as in `//nolint:gosec // reason`, so `//go:generate sh -c "echo // x"` has none. A
   `//lint:ignore Check reason` has no second `//`, so its reason is never read. A struct tag is a string, so a comment
-  after it is read.
+  after it is read. A generated file (`// Code generated … DO NOT EDIT.`) is judged like any other: exclude it in the
+  settings, for example with the path `**/*.pb.go`.
 - Java is lexed across lines. Strings, characters and text blocks (`"""`) are content, an annotation is code, and
   Javadoc follows C1 as JSDoc does. A `\uXXXX` escape is not translated before lexing: see Known false positives.
 - Rust is lexed across lines. Block comments nest, so `/* a /* b */ c */` is one comment. Strings, raw strings
   (`r"..."`, `r#"..."#`, any number of hashes), byte strings (`b"..."`, `br#"..."#`), C strings (`c"..."`, `cr"..."`)
   and character literals are content. A quote that starts a lifetime or a loop label (`'a`, `'static`, `break 'a`) is
-  not a character literal. Doc comments (`///`, `//!`, `/** */`, `/*! */`) follow C1, and an attribute is code.
-- In Go, Java and Rust a block comment, string or raw string that never closes is exit code 2.
-- A literal U+2028, U+0085, `\x0b` or `\x0c` inside a string is exit code 2 where a string must close on its line
-  (Go, Java, JavaScript and TypeScript), because the engine splits lines on those characters and the lexer does not.
+  not a character literal, so a `'` that never closes is read as one of those and is never exit code 2. Doc comments
+  (`///`, `//!`, `/** */`, `/*! */`) follow C1, and an attribute is code.
+- In Go, Java and Rust a block comment, string, text block, raw string, rune or character literal that never closes is
+  exit code 2.
+- The engine and the lexers break lines where Python's `str.splitlines` does: at U+2028, U+2029, U+0085, `\x0b`,
+  `\x0c`, `\x1c`, `\x1d` and `\x1e`, though most of the languages read here do not. A string, rune or character
+  literal holding one is exit code 2 where it must close on its line: in Go, Java, CSS, and JavaScript and TypeScript
+  outside `.jsx` and `.tsx` files. In a `//` comment, the text after one is read as code, so an unmatched quote there is
+  exit code 2 in Go, Java, and JavaScript and TypeScript outside `.jsx` and `.tsx` files. In Rust an apostrophe there
+  is read as a lifetime, and a `"` opens a string that runs to the next `"`: exit code 2 if there is none, and
+  otherwise the comments in between are not judged.
 - A comment block can be split by blank lines into separate one-line blocks, and each passes C1. Joining such runs
   flagged many legitimately separate comments, so it is not done. The write-time hook's message tells the agent that
   splitting is not a fix.
