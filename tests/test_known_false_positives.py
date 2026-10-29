@@ -87,3 +87,13 @@ class TestRubyLiteralsTheLineScannerDoesNotKnow(unittest.TestCase):
         # `a <<b` is an append, but a space before `<<` and a word after it is the shape of an opener.
         with self.assertRaises(LexError):
             engine.check_text("a.rb", "puts x if a <<b\n")
+
+
+class TestMakefileShapesTheLexerDoesNotKnow(unittest.TestCase):
+    def test_the_text_after_a_semicolon_on_a_rule_line_reads_make_syntax(self):
+        # The recipe after `;` is not told from make syntax, so quotes do not protect the hash.
+        self.assertEqual(found("Makefile", 'all: ; echo "# ADR-9"\n'), [("C3", 1)])
+
+    def test_a_custom_recipe_prefix_is_not_a_recipe(self):
+        # `.RECIPEPREFIX` is not read, so a recipe line behind it is make syntax.
+        self.assertEqual(found("Makefile", '.RECIPEPREFIX = >\nall:\n> echo "# ADR-9"\n'), [("C3", 3)])

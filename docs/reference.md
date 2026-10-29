@@ -309,6 +309,7 @@ accident.
 | C# and HCL | A code line that starts with `*` counts as comment prose, so a multiplication wrapped over two lines is a C1 block. | `var x = a` / `    * b` / `    * c;` |
 | Every language | `docs/` matches anywhere in a comment, also inside a web address. | `// https://developer.mozilla.org/en-US/docs/Web/API/fetch` is C3 |
 | Shell, YAML, HCL | Any `#` outside quotes starts a comment, also inside a parameter expansion. | `x=${y#docs/prefix}` is C3. A line over 120 characters that holds `$#` is C7 |
+| Makefile | The text after `;` on a rule line is read as make syntax, so quotes do not protect a hash. `.RECIPEPREFIX` is not read, so a recipe behind a custom prefix is make syntax too. | `all: ; echo "# docs/x"` is C3 |
 | C# | Lines inside a multi-line verbatim string `@"..."` are judged as code. | `// ...` lines inside one are a C1 block |
 | Python, with the `agent-context` pack on | `as requested` and `per the spec` match ordinary prose in a comment. Pinned by `tests/test_known_false_positives.py`. | `# calling CloseHandle as requested in [1]` and `# Map conditions (per the spec) to signals` are C3 |
 
