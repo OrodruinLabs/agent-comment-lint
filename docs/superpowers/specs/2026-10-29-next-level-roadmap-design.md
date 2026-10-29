@@ -558,11 +558,14 @@ Decided on 2026-10-29:
 6. **E3:** reworded so a rejected write reaches each agent through its documented block signal, and crashes stay
    exit 2 (section 3).
 
-Still open:
+Ruled on 2026-10-29 by the builder, under the owner's standing instruction to decide rather than ask. The owner can
+override this before v1.6.0 is tagged:
 
-- **Doc comment conventions in new languages (section 7).** To be brought to the owner when section 7 starts, before
-  the C-family step. If C1 applies unchanged, multi-line Javadoc and Rust `///` docs with an Examples section would
-  block almost every new public item, which could change whether those languages come before Kotlin, Swift and C.
+7. **Doc comments in new languages (section 7): C1 applies unchanged.** A doc comment block holds one prose line.
+   A complete one-line `@tag` doesn't count, as with JSDoc. Lines inside a fenced example are not exempt, because
+   exempting them would not help in practice: a Rust `# Examples` heading is itself a second prose line, so the
+   block would fail either way. Multi-line Javadoc, Go package docs and Rust `///` docs are blocked, as Python
+   docstrings and JSDoc already are. The order stays Go, Java and Rust, then Kotlin, Swift and C/C++.
 
 ## 10. Left to the builder
 
