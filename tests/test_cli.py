@@ -1319,6 +1319,25 @@ class TestSessionHooks(Sandbox):
         self.assertIn("b.ts: could not scan: is not UTF-8 text", err)
         self.assertNotIn("binary", err)
 
+    def test_a_stop_with_findings_says_it_found_them_in_what_changed(self):
+        self.start()
+        self.write("b.ts", "// one\n// two\n")
+        _code, _out, err = self.stop()
+        self.assertTrue(err.startswith(
+            "Before you finish: agent-comment-lint found comments that break the policy in what changed during this "
+            "session.\nOnly lines changed since this session started and not yet committed are judged.\nb.ts:1: C1:"),
+            err)
+
+    def test_a_stop_with_only_scan_errors_says_it_could_not_check(self):
+        self.start()
+        self.write("a.ts", "const a = `never closed\n")
+        code, _out, err = self.stop()
+        self.assertEqual(code, 2)
+        self.assertTrue(err.startswith(
+            "Before you finish: agent-comment-lint could not check what changed during this session.\n"
+            "Only lines changed since this session started and not yet committed are judged.\n"), err)
+        self.assertNotIn("found comments", err)
+
     def test_a_fixed_violation_passes_the_next_stop(self):
         self.start()
         self.write("b.ts", "// one\n// two\n")

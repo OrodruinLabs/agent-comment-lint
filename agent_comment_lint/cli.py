@@ -24,8 +24,10 @@ HOOK_NOT_UTF8 = "is not UTF-8 text, so the write cannot be judged"
 SESSION_NOT_UTF8 = "is not UTF-8 text, so the lines this session changed cannot be judged"
 HOOK_BLOCKED = "Blocked: agent-comment-lint rejects this write.\n"
 HOOK_HEADER = HOOK_BLOCKED + report.HOOK_SCOPE
-HOOK_STOP_HEADER = ("Before you finish: agent-comment-lint found comments this session added that break the policy.\n"
-                    "Only lines changed since this session started are judged.\n")
+STOP_FOUND = ("Before you finish: agent-comment-lint found comments that break the policy in what changed during this "
+              "session.\n")
+STOP_UNCHECKED = "Before you finish: agent-comment-lint could not check what changed during this session.\n"
+STOP_SCOPE = "Only lines changed since this session started and not yet committed are judged.\n"
 STOP_CLOSING = ("Fix these comments before you finish; the check runs again when you stop.",
                 report.HOOK_CLOSING[1], report.HOOK_CLOSING[2])
 
@@ -483,7 +485,8 @@ def _hook_verdict(run_result, texts, tool, stderr, event=None):
     if not report.exit_code(run_result):
         return 0
     if event == "Stop":
-        stderr.write(report.hook_text(run_result, texts, HOOK_STOP_HEADER, STOP_CLOSING))
+        header = (STOP_FOUND if run_result.findings else STOP_UNCHECKED) + STOP_SCOPE
+        stderr.write(report.hook_text(run_result, texts, header, STOP_CLOSING))
     else:
         stderr.write(report.hook_text(run_result, texts, HOOK_HEADER, _hook_closing(tool)))
     return 2
