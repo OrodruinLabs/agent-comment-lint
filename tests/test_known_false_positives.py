@@ -3,7 +3,7 @@ import unittest
 
 from agent_comment_lint import engine, governance
 from agent_comment_lint.lexers import LexError
-from support import LONG, found
+from support import LONG, comments, found
 
 
 class TestALeadingStarInLineLexedCode(unittest.TestCase):
@@ -97,3 +97,13 @@ class TestMakefileShapesTheLexerDoesNotKnow(unittest.TestCase):
     def test_a_custom_recipe_prefix_is_not_a_recipe(self):
         # `.RECIPEPREFIX` is not read, so a recipe line behind it is make syntax.
         self.assertEqual(found("Makefile", '.RECIPEPREFIX = >\nall:\n> echo "# ADR-9"\n'), [("C3", 3)])
+
+    def test_an_interpolation_inside_a_percent_regex_reads_a_comment(self):
+        # The line scanner does not know `%r{}`, so the `#` that opens an interpolation starts a comment.
+        self.assertEqual(comments("a.rb", "X = %r{a#{B}c}\n"), [["#{B}c}"]])
+
+
+class TestMakefileDefineComments(unittest.TestCase):
+    def test_a_comment_line_inside_a_define_block_is_not_read(self):
+        # The body of a `define` is content, so a comment written in it is never judged.
+        self.assertEqual(found("Makefile", "define rule\n# see ADR-7\nendef\n"), [])
