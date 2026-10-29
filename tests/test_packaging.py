@@ -64,6 +64,13 @@ class TestHookWrapper(unittest.TestCase):
                 del env["AGENT_COMMENT_LINT_PYTHON"]
             return subprocess.run([SHELL, WRAPPER], input=stdin.encode("utf-8"), capture_output=True, env=env)
 
+    def test_the_wrapper_keeps_unix_line_endings_on_every_checkout(self):
+        with open(WRAPPER, "rb") as handle:
+            self.assertNotIn(b"\r", handle.read())
+        with open(os.path.join(REPO, ".gitattributes"), encoding="utf-8") as handle:
+            rules = [line.split() for line in handle.read().splitlines()]
+        self.assertIn(["*.sh", "text", "eol=lf"], rules)
+
     def test_a_clean_write_passes_silently(self):
         done = self.run_wrapper(CLEAN)
         self.assertEqual((done.returncode, done.stderr), (0, b""))
