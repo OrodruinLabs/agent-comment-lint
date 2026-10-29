@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.0
+
+- Four more languages are read: Ruby (`.rb`, `.rake`, `.gemspec`, and the names `Gemfile` and `Rakefile`), TOML
+  (`.toml`), Dockerfile (`Dockerfile`, `Containerfile` and `.dockerfile`) and Makefile (`Makefile`, `makefile`,
+  `GNUmakefile` and `.mk`). Ruby follows heredocs and `=begin` / `=end` blocks, TOML follows multi-line strings,
+  Dockerfile reads parser directives and follows heredocs, and Makefile reads recipes as shell and `define` blocks as
+  content. A string, heredoc, block or `define` that never closes is exit code 2.
+- Both `.pre-commit-hooks.yaml` ids match the new files.
+- Findings move only for files of these languages, which were skipped before. Nothing moves for any other file.
+
 ## 1.4.0
 
 - `--hook --agent NAME`: the write-time hook can read the event of another coding agent. `--agent` takes `claude`

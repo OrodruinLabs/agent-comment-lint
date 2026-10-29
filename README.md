@@ -55,6 +55,12 @@ The numbers skip because C2, C4 and C6 need a compiler or human judgment, and th
     <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/terraform/terraform-original.svg" width="44" height="44" alt=""><br><b>Terraform and HCL</b><br><sub><code>.tf</code> <code>.tfvars</code> <code>.hcl</code></sub></td>
     <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/python/python-original.svg" width="44" height="44" alt=""><br><b>Python</b><br><sub><code>.py</code></sub></td>
   </tr>
+  <tr>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/ruby/ruby-original.svg" width="44" height="44" alt=""><br><b>Ruby</b><br><sub><code>.rb</code> <code>.rake</code> <code>.gemspec</code> <code>Gemfile</code> <code>Rakefile</code></sub></td>
+    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/toml/9C4121" width="44" height="44" alt=""><br><b>TOML</b><br><sub><code>.toml</code></sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/docker/docker-original.svg" width="44" height="44" alt=""><br><b>Dockerfile</b><br><sub><code>Dockerfile</code> <code>Containerfile</code> <code>.dockerfile</code></sub></td>
+    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/gnu/A42E2B" width="44" height="44" alt=""><br><b>Makefile</b><br><sub><code>Makefile</code> <code>GNUmakefile</code> <code>.mk</code></sub></td>
+  </tr>
 </table>
 </div>
 
@@ -86,7 +92,7 @@ The details for each agent are in [the reference](https://github.com/OrodruinLab
 
 ## Setup
 
-Pick where it runs; every channel runs the same check. The snippets pin `v1.4.0`. Keep a pin, so a new release never
+Pick where it runs; every channel runs the same check. The snippets pin `v1.5.0`. Keep a pin, so a new release never
 changes your results without a commit of yours.
 
 ### Claude Code
@@ -104,7 +110,7 @@ through Bash, on the lines changed since the session started and not yet committ
 ### Other coding agents
 
 For Codex CLI, Windsurf / Devin and Gemini CLI, install the command as under [Command line](#command-line), then copy
-the agent's template from `integrations/` and the guard scripts at the `v1.4.0` tag. The steps for each agent are in
+the agent's template from `integrations/` and the guard scripts at the `v1.5.0` tag. The steps for each agent are in
 [the reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#other-coding-agents).
 
 ### GitHub Actions
@@ -118,7 +124,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: OrodruinLabs/agent-comment-lint@v1.4.0
+      - uses: OrodruinLabs/agent-comment-lint@v1.5.0
 ```
 
 Only the lines the pull request changes are checked. Keep `fetch-depth: 0`, or the step cannot see what changed and
@@ -130,7 +136,7 @@ lists them all. The inputs are in [the reference](https://github.com/OrodruinLab
 ```yaml
 repos:
   - repo: https://github.com/OrodruinLabs/agent-comment-lint
-    rev: v1.4.0
+    rev: v1.5.0
     hooks:
       - id: agent-comment-lint-staged
 ```
@@ -144,15 +150,15 @@ staged, so it judges nothing. In CI, use the GitHub Action (or `--diff`), or the
 ### Command line
 
 ```
-uv tool install agent-comment-lint==1.4.0
-pipx install agent-comment-lint==1.4.0
+uv tool install agent-comment-lint==1.5.0
+pipx install agent-comment-lint==1.5.0
 ```
 
 To install from the repository instead:
 
 ```
-uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.4.0
-pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.4.0
+uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.5.0
+pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.5.0
 ```
 
 `uvx agent-comment-lint` runs it without installing, which suits CI and trials.
@@ -183,7 +189,7 @@ are no limits to change and no way to silence one comment inline. Every entry st
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.4.0/schema/agent-comment-lint.schema.json",
+  "$schema": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.5.0/schema/agent-comment-lint.schema.json",
   "exclude": [{ "path": "vendor/", "reason": "third-party code" }],
   "governance": {
     "packs": ["azure-boards"],
