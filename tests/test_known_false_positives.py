@@ -2,6 +2,7 @@
 import unittest
 
 from agent_comment_lint import engine, governance
+from agent_comment_lint.lexers import LexError
 from support import LONG, found
 
 
@@ -69,3 +70,20 @@ class TestRubyLiteralsTheLineScannerDoesNotKnow(unittest.TestCase):
     def test_a_regex_literal_with_a_hash_reads_a_comment(self):
         # The line scanner does not know Ruby's regex literals.
         self.assertEqual(found("a.rb", "/#docs/prefix/ =~ s\n"), [("C3", 1)])
+
+    def test_a_second_heredoc_on_one_line_is_not_tracked(self):
+        # Only the first heredoc opened on a line is tracked, so the second payload reads as code.
+        self.assertEqual(found("a.rb", "foo(<<~A, <<~B)\na\nA\n# see ADR-7\nB\n"), [("C3", 4)])
+
+    def test_the_data_section_after_end_reads_comments(self):
+        # The lexer does not know that `__END__` ends the source.
+        self.assertEqual(found("a.rb", "x = 1\n__END__\n# see ADR-7\n"), [("C3", 3)])
+
+    def test_a_backtick_heredoc_payload_reads_comments(self):
+        # The opener pattern knows quoted identifiers but not backtick ones.
+        self.assertEqual(found("a.rb", "x = <<~`X`\n# see ADR-7\nX\n"), [("C3", 2)])
+
+    def test_a_shift_with_a_bare_word_reads_as_a_heredoc_opener(self):
+        # `a <<b` is an append, but a space before `<<` and a word after it is the shape of an opener.
+        with self.assertRaises(LexError):
+            engine.check_text("a.rb", "puts x if a <<b\n")
