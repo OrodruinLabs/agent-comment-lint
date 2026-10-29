@@ -1,6 +1,5 @@
 """Rendering a run as text or JSON. Ordering is fixed so two runs over the same tree print the same bytes."""
 import json
-import re
 from collections import namedtuple
 
 Report = namedtuple("Report", ["mode", "scanned", "findings", "errors", "unresolved_lines"])
@@ -26,7 +25,6 @@ HOOK_CLOSING = (
     "exclusions are for generated and third-party code.",
 )
 WRITE_RETRY = "Re-send this Write with only the comment lines changed."
-LINE_BREAK = re.compile(r"\r\n|\r|\n")
 
 
 def exit_code(report):
@@ -79,7 +77,7 @@ def _excerpt(text, finding):
     """The finding's source lines, indented, cut to the excerpt limits; empty when the text is not known."""
     if text is None:
         return []
-    lines = LINE_BREAK.split(text)[finding.line - 1:finding.end_line]
+    lines = text.splitlines()[finding.line - 1:finding.end_line]
     shown = ["    " + (line if len(line) <= EXCERPT_WIDTH else line[:EXCERPT_WIDTH - 1] + "\u2026")
              for line in lines[:EXCERPT_LINES]]
     if len(lines) > EXCERPT_LINES:

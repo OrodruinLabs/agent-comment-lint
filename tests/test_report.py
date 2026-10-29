@@ -119,3 +119,9 @@ class TestHookText(unittest.TestCase):
         result = report.Report("hook", 1, [("a.ts", finding("C3", 4, 4, "governance reference 'ADR-1'"))], [], 0)
         lines = report.hook_text(result, {}, HEADER, CLOSING).splitlines()
         self.assertEqual(lines[2:4], ["a.ts:4: C3: governance reference 'ADR-1'", "  Fix: " + report.FIXES["C3"]])
+
+    def test_excerpt_lines_are_numbered_as_the_engine_numbers_them(self):
+        text = "// a\x0c// b\nint x;\n"
+        result = report.Report("hook", 1, [("a.ts", finding("C1", 1, 2, "2-line prose block (limit 1)"))], [], 0)
+        lines = report.hook_text(result, {"a.ts": text}, HEADER, CLOSING).splitlines()
+        self.assertEqual(lines[3:5], ["    // a", "    // b"])
