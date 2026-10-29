@@ -275,10 +275,21 @@ class TestPreCommitHooks(unittest.TestCase):
         covered = re.compile(filters[0])
         for extension in lexers.EXTENSIONS:
             self.assertTrue(covered.search("dir/x" + extension), extension)
-        for name in lexers.NAMES:
-            self.assertTrue(covered.search("dir/" + name), name)
+        self.assert_names_filtered(covered, lexers.NAMES)
         for other in ("dir/x.md", "dir/x.json", "dir/Makefile.bak"):
             self.assertFalse(covered.search(other), other)
+
+    def assert_names_filtered(self, covered, names):
+        for name in names:
+            self.assertTrue(covered.search(name), name)
+            self.assertTrue(covered.search("dir/" + name), name)
+            self.assertFalse(covered.search("dir/My" + name), name)
+            self.assertFalse(covered.search("dir/" + name + ".bak"), name)
+
+    def test_the_name_check_fails_for_a_filter_missing_its_anchor(self):
+        self.assert_names_filtered(re.compile(r"(^|/)(Dockerfile|Makefile)$"), ("Dockerfile", "Makefile"))
+        with self.assertRaises(AssertionError):
+            self.assert_names_filtered(re.compile(r"(Dockerfile|Makefile)$"), ("Dockerfile", "Makefile"))
 
 
 class TestSchema(unittest.TestCase):
