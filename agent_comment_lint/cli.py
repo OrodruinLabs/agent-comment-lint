@@ -98,19 +98,26 @@ def _root(args, cwd, mode):
     return root, mode == "all" and _work_tree(root, mode) is not None
 
 
+def _parsed_settings(data):
+    """The settings in the file's bytes, read as UTF-8 with a leading byte-order mark skipped."""
+    try:
+        text = data.decode(ENCODING)
+    except UnicodeDecodeError:
+        raise settings.ConfigError("is not UTF-8 text")
+    return settings.parse(text)
+
+
 def _load_config(args, root, cwd):
     """The repository's settings; a file named with --config must exist, the default one may be absent."""
     path = os.path.join(cwd, args.config) if args.config else os.path.join(root, settings.CONFIG_NAME)
     if not args.config and not os.path.exists(path):
         return settings.EMPTY
     try:
-        with open(path, encoding=ENCODING) as handle:
-            text = handle.read()
+        with open(path, "rb") as handle:
+            data = handle.read()
     except OSError as error:
         raise settings.ConfigError(error.strerror or str(error))
-    except UnicodeDecodeError:
-        raise settings.ConfigError("is not UTF-8 text")
-    return settings.parse(text)
+    return _parsed_settings(data)
 
 
 def _load_hook_config(args, root, cwd):
@@ -124,12 +131,7 @@ def _load_hook_config(args, root, cwd):
     if not gitio.has_head(root):
         return _load_config(args, root, cwd)
     data = gitio.committed_blob(root, settings.CONFIG_NAME)
-    if data is None:
-        return settings.EMPTY
-    try:
-        return settings.parse(data.decode(ENCODING))
-    except UnicodeDecodeError:
-        raise settings.ConfigError("is not UTF-8 text")
+    return settings.EMPTY if data is None else _parsed_settings(data)
 
 
 def _judged(config, path):
