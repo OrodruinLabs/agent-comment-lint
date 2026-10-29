@@ -1862,3 +1862,27 @@ class TestSessionHooksOutsideGit(Sandbox):
         self.assertEqual(self.run_cli("--hook", stdin=session_event("SessionStart")), (0, "", ""))
         self.write("b.ts", "// one\n// two\n")
         self.assertEqual(self.run_cli("--hook", stdin=session_event("Stop")), (0, "", ""))
+
+
+class TestHookWindsurf(Sandbox):
+    """`--hook --agent windsurf` on a pre_write_code event, whose edits must apply exactly."""
+
+    def run_windsurf(self, name, new_string, old_string=""):
+        event = fixture("windsurf-write")
+        event["tool_info"] = {"file_path": os.path.join(self.tmp, name),
+                              "edits": [{"old_string": old_string, "new_string": new_string}]}
+        return self.run_cli("--hook", "--agent", "windsurf", stdin=json.dumps(event))
+
+    def test_a_new_file_with_a_two_line_comment_is_blocked(self):
+        code, out, err = self.run_windsurf("a.ts", "// one\n// two\n")
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("a.ts:1: C1: 2-line prose block (limit 1)", err)
+
+    def test_a_clean_new_file_passes_silently(self):
+        self.assertEqual(self.run_windsurf("a.ts", "const a = 1;\n"), (0, "", ""))
+
+    def test_an_edit_whose_old_string_is_not_in_the_file_is_blocked(self):
+        self.write("a.ts", "const a = 1;\n")
+        code, _out, err = self.run_windsurf("a.ts", "// one\n", old_string="const z = 9;")
+        self.assertEqual(code, 2)
+        self.assertIn("a.ts: could not scan: " + cli.PATCH_NOT_APPLIED, err)

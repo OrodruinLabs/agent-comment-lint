@@ -471,3 +471,67 @@ class TestCodexTemplate(unittest.TestCase):
         done = self.run_hook("*** Begin Patch\n*** Add File: clean.ts\n+const a = 1;\n*** End Patch", in_git=False)
         self.assertEqual(done.returncode, 2)
         self.assertNotEqual(done.stderr.strip(), b"")
+
+
+WINDSURF_HOOKS = os.path.join(REPO, "integrations", "windsurf", "hooks.json")
+WINDSURF_BASH = shutil.which("bash") or SHELL
+WINDSURF_WRITE = "windsurf-write"
+
+
+class TestWindsurfTemplate(unittest.TestCase):
+    """The Windsurf template installed as `.devin/hooks.json` with the guards beside it, run from the workspace root."""
+
+    def handler(self):
+        groups = load("integrations", "windsurf", "hooks.json")["hooks"]
+        self.assertEqual(list(groups), ["pre_write_code"])
+        (handler,) = groups["pre_write_code"]
+        return handler
+
+    def test_both_commands_run_the_guard_for_windsurf(self):
+        handler = self.handler()
+        self.assertTrue(handler["show_output"])
+        self.assertIn(".devin/agent-comment-lint-guard.sh windsurf", handler["command"])
+        self.assertIn("agent-comment-lint-guard.cmd", handler["powershell"])
+        self.assertIn("windsurf", handler["powershell"])
+
+    def run_hook(self, new_string, guards=(".sh", ".cmd")):
+        """Cascade runs `bash -c command`, or `powershell -Command powershell`, in the workspace root."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = os.path.join(os.path.realpath(tmp), "repo")
+            os.makedirs(os.path.join(root, ".devin"))
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            shutil.copy(WINDSURF_HOOKS, os.path.join(root, ".devin"))
+            for suffix in guards:
+                shutil.copy(GUARD + suffix, os.path.join(root, ".devin"))
+            bin_dir = os.path.join(tmp, "bin")
+            os.mkdir(bin_dir)
+            arguments = "%*" if os.name == "nt" else '"$@"'
+            fake_command(bin_dir, '"%s" -m agent_comment_lint %s' % (sys.executable, arguments))
+            env = dict(os.environ, PATH=bin_dir + os.pathsep + os.environ["PATH"], PYTHONPATH=REPO,
+                       GIT_CEILING_DIRECTORIES=os.path.realpath(tmp))
+            event = fixture(WINDSURF_WRITE)
+            event["tool_info"] = {"file_path": os.path.join(root, "dirty.ts"),
+                                  "edits": [{"old_string": "", "new_string": new_string}]}
+            if os.name == "nt":
+                command = ["powershell", "-NoProfile", "-Command", self.handler()["powershell"]]
+            else:
+                command = [WINDSURF_BASH, "-c", self.handler()["command"]]
+            return subprocess.run(command, input=json.dumps(event).encode("utf-8"), cwd=root, env=env,
+                                  capture_output=True)
+
+    @unittest.skipUnless(WINDSURF_BASH or os.name == "nt", "no POSIX shell on PATH")
+    def test_a_write_adding_a_two_line_comment_is_blocked(self):
+        done = self.run_hook("// one\n// two\n")
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn(b"dirty.ts:1: C1: 2-line prose block (limit 1)", done.stderr)
+
+    @unittest.skipUnless(WINDSURF_BASH or os.name == "nt", "no POSIX shell on PATH")
+    def test_a_clean_write_passes_silently(self):
+        done = self.run_hook("const a = 1;\n")
+        self.assertEqual((done.returncode, done.stdout, done.stderr), (0, b"", b""))
+
+    @unittest.skipUnless(WINDSURF_BASH or os.name == "nt", "no POSIX shell on PATH")
+    def test_a_missing_guard_is_blocked_with_two_and_a_reason(self):
+        done = self.run_hook("const a = 1;\n", guards=())
+        self.assertEqual(done.returncode, 2)
+        self.assertNotEqual(done.stderr.strip(), b"")

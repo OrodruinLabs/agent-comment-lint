@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "pre_write_code": [
+      {
+        "command": "sh .devin/agent-comment-lint-guard.sh windsurf || exit 2",
+        "powershell": "& '.devin\\agent-comment-lint-guard.cmd' windsurf; if ($LASTEXITCODE -ne 0) { exit 2 }; exit 0",
+        "show_output": true
+      }
+    ]
+  }
+}

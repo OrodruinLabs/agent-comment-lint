@@ -85,8 +85,25 @@ def _codex(event):
     return found
 
 
-ADAPTERS = {"claude": _claude, "codex": _codex}
-TITLES = {"claude": "Claude Code", "codex": "Codex"}
+def _windsurf(event):
+    """Cascade's pre_write_code: its edits applied exactly, because how Windsurf resolves them is undocumented."""
+    action = event.get("agent_action_name")
+    if not isinstance(action, str):
+        raise HookInputError("no \"agent_action_name\"")
+    if action != "pre_write_code":
+        return []
+    info = event.get("tool_info")
+    path = info.get("file_path") if isinstance(info, dict) else None
+    if not isinstance(path, str) or not path:
+        raise HookInputError("pre_write_code with no \"tool_info.file_path\"")
+    edits = info.get("edits")
+    if not isinstance(edits, list):
+        raise HookInputError("pre_write_code with no \"tool_info.edits\" list")
+    return [Target("MultiEdit", path, {"file_path": path, "edits": edits}, must_apply=True)]
+
+
+ADAPTERS = {"claude": _claude, "codex": _codex, "windsurf": _windsurf}
+TITLES = {"claude": "Claude Code", "codex": "Codex", "windsurf": "Windsurf"}
 
 
 def targets(event, agent):

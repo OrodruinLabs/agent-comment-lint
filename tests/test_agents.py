@@ -304,3 +304,40 @@ class TestCodexHunks(unittest.TestCase):
 
     def test_every_line_ends_with_a_newline_afterwards(self):
         self.assertEqual(self.apply("a\nb", hunk(["a"], ["x"])), "x\nb\n")
+
+
+class TestWindsurfAdapter(AdapterContract, unittest.TestCase):
+    agent, write_fixture, non_write_fixture, pathless_fixture = (
+        "windsurf", "windsurf-write", "windsurf-read", "windsurf-pathless")
+
+    def test_the_edit_fixture_is_one_multiedit_that_must_apply(self):
+        event = fixture("windsurf-edit")
+        path, edits = event["tool_info"]["file_path"], event["tool_info"]["edits"]
+        self.assertEqual(hook.targets(event, "windsurf"),
+                         [hook.Target("MultiEdit", path, {"file_path": path, "edits": edits}, must_apply=True)])
+
+    def test_the_write_fixture_is_an_edit_with_an_empty_old_string(self):
+        (found,) = hook.targets(fixture("windsurf-write"), "windsurf")
+        self.assertEqual(found.tool_input["edits"][0]["old_string"], "")
+        self.assertEqual(hook.proposed_text(found, None), found.tool_input["edits"][0]["new_string"])
+
+    def test_another_action_is_not_judged(self):
+        self.assertEqual(hook.targets(dict(fixture("windsurf-edit"), agent_action_name="post_write_code"),
+                                      "windsurf"), [])
+
+    def test_an_event_without_an_action_name_is_refused(self):
+        for name in (None, 3):
+            event = dict(fixture("windsurf-edit"), agent_action_name=name)
+            with self.subTest(name=name), self.assertRaises(hook.HookInputError):
+                hook.targets(event, "windsurf")
+        event = fixture("windsurf-edit")
+        del event["agent_action_name"]
+        with self.assertRaises(hook.HookInputError):
+            hook.targets(event, "windsurf")
+
+    def test_a_bad_path_or_edits_is_refused(self):
+        for info in ({"file_path": "", "edits": []}, {"file_path": 3, "edits": []}, {"edits": []},
+                     {"file_path": "a.py", "edits": "x"}, {"file_path": "a.py"}, "x"):
+            event = dict(fixture("windsurf-edit"), tool_info=info)
+            with self.subTest(info=info), self.assertRaises(hook.HookInputError):
+                hook.targets(event, "windsurf")
