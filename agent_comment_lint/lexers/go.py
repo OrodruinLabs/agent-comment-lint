@@ -4,7 +4,8 @@ import re
 from . import clike
 from .base import CODE, COMMENT, STRING, Family, Line
 
-GO = clike.Syntax(False, False, "backtick", False, "simple", False)
+GO = clike.Syntax(nested_blocks=False, multiline_strings=False, raw_string="backtick", text_block=False,
+                  char_literal="simple", line_continuation=False)
 # What go/ast's isDirective accepts, a bare `//nolint`, and the `// +build` line that came before `//go:build`.
 DIRECTIVE = re.compile(r"//(?:line |extern |export |[a-z0-9]+:[a-z0-9]|nolint(?:[ \t]|$))|//[ \t]*\+build(?:[ \t]|$)")
 # In a directive, a quoted argument is skipped whole; a quote that never closes leaves no reason to find.

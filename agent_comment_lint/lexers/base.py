@@ -42,13 +42,17 @@ class LineBuilder:
         if not text:
             return
         if self._segments and self._segments[-1][0] == kind:
-            self._segments[-1] = (kind, self._segments[-1][1] + text)
+            self._segments[-1][1].append(text)
         else:
-            self._segments.append((kind, text))
+            self._segments.append((kind, [text]))
+
+    def _line(self):
+        # Each segment's parts are joined once here, so many small emits on one long line stay linear.
+        return Line([(kind, "".join(parts)) for kind, parts in self._segments], self._opens_in, tuple(self._blocks))
 
     def newline(self, opens_in):
         """Close the current line; `opens_in` is the state the next line starts in."""
-        self.lines.append(Line(self._segments, self._opens_in, tuple(self._blocks)))
+        self.lines.append(self._line())
         self._segments = []
         self._opens_in = opens_in
         self._blocks = []
@@ -80,7 +84,7 @@ class LineBuilder:
 
     def finish(self):
         """Close the last line and return every Line."""
-        self.lines.append(Line(self._segments, self._opens_in, tuple(self._blocks)))
+        self.lines.append(self._line())
         return self.lines
 
 
@@ -94,6 +98,11 @@ def _block_comment_body(part, opens, closes):
     if opens:
         return block_prose(part[len(BLOCK_OPEN):])
     return block_prose((part[:-len(BLOCK_CLOSE)] if closes else part).strip())
+
+
+def text_before(src, i):
+    """True when anything but space comes before index i on its line."""
+    return bool(src[src.rfind("\n", 0, i) + 1:i].strip())
 
 
 def quoted_end(src, i):

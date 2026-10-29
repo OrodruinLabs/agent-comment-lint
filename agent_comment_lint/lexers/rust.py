@@ -2,6 +2,7 @@
 from . import clike
 from .base import Family
 
-RUST = clike.Syntax(True, True, "rust", False, "rust", False)
+RUST = clike.Syntax(nested_blocks=True, multiline_strings=True, raw_string="rust", text_block=False,
+                    char_literal="rust", line_continuation=False)
 
 FAMILY = Family("rust", (".rs",), clike.MARKERS, clike.lexer(RUST))

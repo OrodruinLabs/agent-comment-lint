@@ -47,6 +47,14 @@ class TestTextBlocks(unittest.TestCase):
         text = 'char c = \'"\'; String s = "\\"\\"\\""; String t = "";\nint a; // see ADR-9\n'
         self.assertEqual(found("A.java", text), [("C3", 2)])
 
+    def test_a_text_block_closes_at_its_first_three_quotes(self):
+        with self.assertRaises(LexError) as caught:
+            found("A.java", 'String s = """\n  a""""; // see ADR-9\n')
+        self.assertEqual(caught.exception.line, 2)
+
+    def test_an_escaped_quote_before_the_close_is_content(self):
+        self.assertEqual(found("A.java", 'String s = """\n  a\\""""; // see ADR-9\n'), [("C3", 2)])
+
     def test_a_text_block_holding_comment_delimiters_is_content(self):
         text = 'String s = """\n  /* x */ /*\n""";\nint a; // see ADR-9\n'
         self.assertEqual(found("A.java", text), [("C3", 4)])

@@ -2,7 +2,7 @@
 import re
 from collections import namedtuple
 
-from .base import CODE, COMMENT, STRING, BlockLine, LexError, LineBuilder, Markers, normalized
+from .base import CODE, COMMENT, STRING, BlockLine, LexError, LineBuilder, Markers, normalized, quoted_end, text_before
 
 Syntax = namedtuple("Syntax", ["nested_blocks", "multiline_strings", "raw_string", "text_block", "char_literal",
                                "line_continuation"])
@@ -11,6 +11,8 @@ Syntax.__doc__ = "What one C-family language adds to `//`, `/* */`, `\"...\"` an
 MARKERS = Markers(hash=False, slash=True, block=True, star=False)
 
 WORD = re.compile(r"\w*")
+# Code that can start nothing: a word joins only when no quote or `#` follows it, as it may prefix a raw string.
+CODE_RUN = re.compile(r"(?:\w+(?![\w\"#])|[^\w\n/\"'`#])*")
 BLOCK_DELIMITER = re.compile(r"/\*|\*/")
 TEXT_BLOCK = '"""'
 RUST_RAW = re.compile(r'(#*)"')
@@ -41,7 +43,11 @@ def _lex(src, syntax):
     out = LineBuilder()
     i = 0
     while i < len(src):
-        if src[i] == "\n":
+        run = CODE_RUN.match(src, i).end()
+        if run > i:
+            out.emit(CODE, src[i:run])
+            i = run
+        elif src[i] == "\n":
             out.newline(CODE)
             i += 1
         elif src.startswith("//", i):
@@ -72,7 +78,7 @@ def _line_comment(out, src, i, continues, place=False):
     if "\n" not in comment and not place:
         out.emit(COMMENT, comment)
         return end
-    after_code = bool(src[src.rfind("\n", 0, i) + 1:i].strip())
+    after_code = text_before(src, i)
     for index, part in enumerate(comment.split("\n")):
         if index:
             out.newline(COMMENT)
@@ -127,23 +133,18 @@ def _literal_end(src, i, word, syntax):
         if end is not None:
             return end
     if syntax.text_block and src.startswith(TEXT_BLOCK, i):
-        return _text_block_end(src, i)
-    if src[i] == '"':
-        return _close(src, i, i + 1, '"', "string", "\\", one_line=not syntax.multiline_strings)
+        return _close(src, i, i + len(TEXT_BLOCK), TEXT_BLOCK, "text block", "\\")
+    if src[i] == '"' and syntax.multiline_strings:
+        return _close(src, i, i + 1, '"', "string", "\\")
     if src[i] == "'" and syntax.char_literal == "rust":
         char = RUST_CHAR.match(src, i)
         return char.end() if char else None
-    if src[i] == "'":
-        return _close(src, i, i + 1, "'", "character literal", "\\", one_line=True)
+    if src[i] in "\"'":
+        end = quoted_end(src, i)
+        if end is None:
+            raise _unclosed(src, i, "string" if src[i] == '"' else "character literal")
+        return end
     return None
-
-
-def _text_block_end(src, i):
-    """Index just past the `\"\"\"` block at i; a closing run of more than three quotes ends with its last quote."""
-    end = _close(src, i, i + len(TEXT_BLOCK), TEXT_BLOCK, "text block", "\\")
-    while src[end:end + 1] == '"':
-        end += 1
-    return end
 
 
 def _backtick_end(src, i, word):
@@ -180,9 +181,9 @@ def _cpp_raw_end(src, i, word):
 RAW_STRINGS = {"backtick": _backtick_end, "rust": _rust_raw_end, "swift": _swift_raw_end, "cpp": _cpp_raw_end}
 
 
-def _close(src, i, start, closer, what, escape="", one_line=False):
+def _close(src, i, start, closer, what, escape=""):
     """Index just past the closer of the literal that opens at i; raises LexError when it never closes."""
-    end = _closer_end(src, start, closer, escape, one_line)
+    end = _closer_end(src, start, closer, escape, one_line=False)
     if end is None:
         raise _unclosed(src, i, what)
     return end

@@ -1,7 +1,7 @@
 """Makefile: `#` comments in make syntax, shell rules in the recipes of an open rule, `define` blocks as content."""
 import re
 
-from .base import CODE, COMMENT, STRING, BlockLine, Family, LexError, Line, LineBuilder
+from .base import CODE, COMMENT, STRING, BlockLine, Family, LexError, Line, LineBuilder, text_before
 from .hashlike import HASH_ONLY
 
 DEFINE = re.compile(r"\s*(?:(?:override|export|private)\s+)*define(?:\s+(?![\s:?+!]*=)|$)")
@@ -31,7 +31,7 @@ def _emit_comment(out, text, i):
     if "\n" not in comment:
         out.emit(COMMENT, comment)
         return
-    after_code = bool(text[text.rfind("\n", 0, i) + 1:i].strip())
+    after_code = text_before(text, i)
     for index, part in enumerate(comment.split("\n")):
         if index:
             out.newline(COMMENT)

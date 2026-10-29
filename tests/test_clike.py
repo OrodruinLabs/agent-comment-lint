@@ -250,8 +250,11 @@ class TestTextBlocks(unittest.TestCase):
     def test_an_escaped_quote_run_does_not_close(self):
         self.assertEqual(found(self.TEXT_BLOCK, 's = """\na \\""" // ADR-9\n""";\n'), [])
 
-    def test_a_closing_run_of_more_quotes_is_one_close(self):
-        self.assertEqual(found(self.TEXT_BLOCK, 's = """\na""""; // see ADR-9\n'), [("C3", 2)])
+    def test_a_run_of_more_quotes_closes_after_three_and_the_rest_opens_a_string(self):
+        with self.assertRaises(LexError) as caught:
+            found(self.TEXT_BLOCK, 's = """\na""""; // see ADR-9\n')
+        self.assertEqual(caught.exception.line, 2)
+        self.assertEqual(found(self.TEXT_BLOCK, 's = """\na"""""; // see ADR-9\n'), [("C3", 2)])
 
     def test_an_unterminated_text_block_cannot_be_lexed(self):
         with self.assertRaises(LexError) as caught:
@@ -311,6 +314,15 @@ class TestLineContinuation(unittest.TestCase):
     def test_a_blank_continuation_line_ends_the_block(self):
         self.assertEqual(found(self.CONTINUED, "// a \\\n\n// b\nint x;\n"), [])
         self.assertEqual(found(self.CONTINUED, "// a \\\n  \n// b\nint x;\n"), [])
+
+
+class TestLongLines(unittest.TestCase):
+    def test_a_long_line_keeps_its_trailing_comment(self):
+        line = "x = {" + "0x1f, 'a', \"b\", c / 2, r, R, br, u8R, " * 2700 + "}; // see ADR-9\n"
+        self.assertGreater(len(line), 100000)
+        for raw in (None, "backtick", "rust", "swift", "cpp"):
+            with self.subTest(raw=raw):
+                self.assertEqual(comments(PLAIN._replace(raw_string=raw), line), [["// see ADR-9"]])
 
 
 class TestWindowsLineEndings(unittest.TestCase):
