@@ -28,7 +28,7 @@ class TestCheckText(unittest.TestCase):
 
 class TestFamilyForNames(unittest.TestCase):
     NAMED = lexers.Family("named", (".nm",), lexers.Markers(True, False, False, False), None,
-                          ("Dockerfile", "Makefile"))
+                          ("Fakefile", "Otherfile"))
 
     def setUp(self):
         patcher = mock.patch.object(lexers, "FAMILIES", lexers.FAMILIES + (self.NAMED,))
@@ -36,14 +36,14 @@ class TestFamilyForNames(unittest.TestCase):
         self.addCleanup(patcher.stop)
 
     def test_a_file_is_matched_by_its_exact_name(self):
-        self.assertIs(lexers.family_for("ops/Dockerfile"), self.NAMED)
-        self.assertIs(lexers.family_for("Makefile"), self.NAMED)
+        self.assertIs(lexers.family_for("ops/Fakefile"), self.NAMED)
+        self.assertIs(lexers.family_for("Otherfile"), self.NAMED)
 
     def test_a_name_behind_a_backslash_is_matched_too(self):
-        self.assertIs(lexers.family_for("ops\\Dockerfile"), self.NAMED)
+        self.assertIs(lexers.family_for("ops\\Fakefile"), self.NAMED)
 
     def test_a_name_that_only_contains_a_covered_name_is_not_matched(self):
-        for path in ("Makefile.bak", "MyDockerfile", "Dockerfile.orig", "ops/dockerfile"):
+        for path in ("Otherfile.bak", "MyFakefile", "Fakefile.orig", "ops/fakefile"):
             self.assertIsNone(lexers.family_for(path), path)
 
 
