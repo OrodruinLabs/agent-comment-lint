@@ -114,3 +114,10 @@ class TestMakefileShapesTheLexerDoesNotKnow(unittest.TestCase):
     def test_a_comment_line_inside_a_define_block_is_not_read(self):
         # The body of a `define` is content, so a comment written in it is never judged.
         self.assertEqual(found("Makefile", "define rule\n# see ADR-7\nendef\n"), [])
+
+
+class TestGoCgoPreamble(unittest.TestCase):
+    def test_c_code_in_the_comment_before_the_c_import_is_a_prose_block(self):
+        # The preamble is C source for cgo, but to Go it is a comment, so its lines read as prose.
+        text = 'package a\n\n// #include <stdlib.h>\n// static int twice(int x) { return 2 * x; }\nimport "C"\n'
+        self.assertEqual(found("a.go", text), [("C1", 3)])
