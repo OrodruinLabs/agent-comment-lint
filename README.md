@@ -109,6 +109,9 @@ repos:
 This checks only the lines you stage, as the index holds them, so a repository with old findings can turn it on today.
 To judge each staged file whole instead, use `id: agent-comment-lint`, and fix or exclude old findings first.
 
+The staged id is for commit time. Under `pre-commit run --all-files`, in pre-commit.ci or at a pre-push stage nothing is
+staged, so it judges nothing. In CI, use the GitHub Action (or `--diff`), or the whole-file id with `--all-files`.
+
 ### Command line
 
 ```

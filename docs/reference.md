@@ -79,6 +79,10 @@ the commit, read from the index, so a partly staged file is judged as it will be
 old findings. `agent-comment-lint` judges the whole of each staged file. A repository that uses it fixes its old
 findings, or excludes their paths, before it turns the hook on.
 
+The staged id judges only staged lines, so it is for commit time. Under `pre-commit run --all-files`, in pre-commit.ci
+or at a pre-push stage nothing is staged, and it passes without judging anything. For CI, use the GitHub Action (or
+`--diff`), or the whole-file `agent-comment-lint` id with `--all-files`.
+
 ## The rules
 
 | Rule | In plain words |
