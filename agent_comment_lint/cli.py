@@ -19,7 +19,7 @@ BYTE_ORDER_MARK = "\ufeff"
 
 DIFF_MISMATCH = "git counts %d added line(s) but its diff shows %d, so the changed lines cannot be trusted"
 BINARY_NOT_TEXT = "git shows no changed lines for it (a binary file) and it is not UTF-8 text, so it cannot be judged"
-HOOK_INPUT = "standard input is not a Claude Code PreToolUse event: %s"
+HOOK_INPUT = "standard input is not a Claude Code hook event: %s"
 HOOK_NOT_UTF8 = "is not UTF-8 text, so the write cannot be judged"
 SESSION_NOT_UTF8 = "is not UTF-8 text, so the lines this session changed cannot be judged"
 HOOK_BLOCKED = "Blocked: agent-comment-lint rejects this write.\n"
@@ -45,7 +45,8 @@ def _parser():
     mode.add_argument("--stdin-path", metavar="PATH",
                       help="judge the text on standard input as if it were the file PATH")
     mode.add_argument("--hook", action="store_true",
-                      help="judge the write in a Claude Code PreToolUse event on standard input; exit 2 blocks it")
+                      help="read a Claude Code hook event on standard input: judge a PreToolUse write, record a "
+                           "snapshot at SessionStart, check what changed at Stop; exit 2 blocks")
     parser.add_argument("--json", action="store_true", help="print one JSON document instead of text")
     parser.add_argument("--root", metavar="DIR",
                         help="repository root (default: the git top level of the working directory)")

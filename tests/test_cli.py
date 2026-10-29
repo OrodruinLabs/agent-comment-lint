@@ -1,4 +1,5 @@
 """The command line end to end: modes, exit codes, settings, and the could-not-scan paths."""
+import contextlib
 import io
 import json
 import os
@@ -90,6 +91,14 @@ class TestUsage(Sandbox):
 
     def test_json_with_hook_is_a_usage_error(self):
         self.assert_usage_error("--hook", "--json")
+
+    def test_the_hook_help_names_the_three_events_it_reads(self):
+        out = io.StringIO()
+        with self.assertRaises(SystemExit), contextlib.redirect_stdout(out):
+            cli.main(["--help"], cwd=self.tmp)
+        help_text = " ".join(out.getvalue().split())
+        for name in ("PreToolUse", "SessionStart", "Stop"):
+            self.assertIn(name, help_text)
 
 
 class TestFilesMode(Sandbox):
@@ -1046,7 +1055,8 @@ class TestHookMode(Sandbox):
         for stdin in ("not json", json.dumps({"tool_name": "Write", "tool_input": {}}),
                       event("Edit", "a.ts", old_string=1, new_string="b")):
             with self.subTest(stdin=stdin):
-                self.assert_blocked(self.hook(stdin), "--hook: could not scan: standard input is not a Claude Code")
+                self.assert_blocked(self.hook(stdin), "--hook: could not scan: standard input is not a Claude Code "
+                                                      "hook event: ")
 
     def test_a_file_that_is_not_utf_8_blocks(self):
         self.write_bytes("a.ts", b"// caf\xe9\nconst a = 1;\n")

@@ -159,7 +159,7 @@ agent-comment-lint --staged              # only the lines staged for the next co
 agent-comment-lint --all                 # every covered file in the repository
 agent-comment-lint --files a.ts b.py     # the named files
 agent-comment-lint --stdin-path a.ts     # the text on standard input, judged as a.ts
-agent-comment-lint --hook                # a Claude Code PreToolUse event on standard input
+agent-comment-lint --hook                # a Claude Code hook event on standard input: PreToolUse, SessionStart, Stop
 agent-comment-lint --version             # the installed version
 ```
 
@@ -173,7 +173,7 @@ Without an install, `python3 check-agent-comment-lint.py` from a checkout takes 
 | `--all` | Tracked files and new files that are not ignored, as git lists them. Outside a repository it walks the directory instead. Finding no covered file is exit code 2, not a clean run. |
 | `--files` | The files named. A named file that is out of scope or excluded is not judged. Needs no git. |
 | `--stdin-path` | A proposed file body, for an editor or write-time hook. The file on disk is not read. A fragment of a file may not lex; exit code 2 then means "no verdict", and the hook decides what to do with it. Needs no git. |
-| `--hook` | The write in a Claude Code PreToolUse event (`Write`, `Edit`, `MultiEdit`) read from standard input. The whole file the write would leave is judged, and a finding counts only where its lines overlap a line the write adds or changes, as `--diff` does. Exit code 0 lets the write through and prints nothing. Any finding, a file that cannot be scanned, a file on disk that is not UTF-8, or input that is not the event is exit code 2, which blocks the write, with the report on standard error. Without `--root`, a path in another worktree of the same repository is judged from that worktree's top, with its settings file. Other tools, uncovered or excluded paths, other paths outside the root, and an edit the tool itself would refuse are let through. `--json` is a usage error with it. |
+| `--hook` | A Claude Code hook event read from standard input. A `SessionStart` event records a snapshot of the working tree and a `Stop` event judges what changed since: see [The end-of-session check](#the-end-of-session-check). For a PreToolUse event, the write it proposes (`Write`, `Edit`, `MultiEdit`) is judged. The whole file the write would leave is judged, and a finding counts only where its lines overlap a line the write adds or changes, as `--diff` does. Exit code 0 lets the write through and prints nothing. Any finding, a file that cannot be scanned, a file on disk that is not UTF-8, or input that is not the event is exit code 2, which blocks the write, with the report on standard error. Without `--root`, a path in another worktree of the same repository is judged from that worktree's top, with its settings file. Other tools, uncovered or excluded paths, other paths outside the root, and an edit the tool itself would refuse are let through. `--json` is a usage error with it. |
 
 Options: `--json` prints one JSON document instead of text. `--root DIR` sets the repository root (default: the git
 top level of the working directory). `--config FILE` names the settings file.
@@ -185,7 +185,8 @@ file, a repository git refuses to read):
 | --- | --- |
 | `--diff`, `--staged` | Exit code 2, always. There are no changed lines without git. |
 | `--all` | Exit code 2 where a `.git` entry in the directory or a parent, or `GIT_DIR`, claims a repository. The tree is not walked instead. Where nothing claims one, the directory is walked. |
-| `--files`, `--stdin-path`, `--hook` | A verdict all the same. The root is the working directory, or `--root`, so paths are reported from there and the settings file is looked for there. With `--root`, git is not asked at all. |
+| `--files`, `--stdin-path` | A verdict all the same. The root is the working directory, or `--root`, so paths are reported from there and the settings file is looked for there. With `--root`, git is not asked at all. |
+| `--hook` | A PreToolUse write gets a verdict all the same, from the working directory or `--root`. The settings file is read through git, as committed at HEAD, even with `--root`; where git names no work tree, the file on disk is read instead. `SessionStart` records no snapshot, and the `Stop` check lets the session end. Once a snapshot is found, a git failure at stop is exit code 2. |
 
 Output is one line per finding, ordered by path, line and rule, then one summary line:
 
