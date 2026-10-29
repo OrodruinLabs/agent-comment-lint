@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.0
+
+- `--hook --agent NAME`: the write-time hook can read the event of another coding agent. `--agent` takes `claude`
+  (the default, unchanged), `codex`, `windsurf` or `gemini`, and is a usage error without `--hook`. The three
+  adapters are built from each agent's documentation and are not yet verified live: no agent has been seen blocking
+  a write. Copilot, Cursor, Kiro and Antigravity have no adapter, because their payloads are undocumented.
+- Guard and capture scripts: `integrations/guard/` turns a missing command or any failure into exit 2, and
+  `integrations/capture/` records an agent's events to `AGENT_COMMENT_LINT_CAPTURE` so a new adapter can be built.
+- `PATCH_NOT_APPLIED`: a Codex patch or a Windsurf or Gemini edit that does not apply to the file on disk is blocked
+  with "the edit does not apply exactly to the file on disk, so it cannot be judged".
+- No finding moves.
+
 ## 1.3.0
 
 - End-of-session check: a new check at Stop, in the plugin only. A snapshot taken at session start lets it judge only

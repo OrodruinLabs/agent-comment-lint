@@ -63,7 +63,7 @@ JSX and TSX are included. Other files are skipped, and so are dependency and bui
 
 ## Setup
 
-Pick where it runs; every channel runs the same check. The snippets pin `v1.3.0`. Keep a pin, so a new release never
+Pick where it runs; every channel runs the same check. The snippets pin `v1.4.0`. Keep a pin, so a new release never
 changes your results without a commit of yours.
 
 ### Claude Code
@@ -78,6 +78,31 @@ then `py -3`. A write that adds a bad comment is blocked, and Claude sees why. O
 leaves alone never block it. When Claude stops, the plugin also checks the comments written any other way, such as
 through Bash, on the lines changed since the session started and not yet committed. To turn it on for a whole team, see [Claude Code setup](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#claude-code).
 
+### Other coding agents
+
+`agent-comment-lint --hook --agent NAME` reads another agent's write event, with `NAME` one of `codex`, `windsurf` and
+`gemini`. The guard scripts in `integrations/guard/` run it and turn a missing command or any failure into exit 2, the
+code that blocks. No agent below has been seen blocking a write live, so none is listed as supported.
+
+Not yet verified. Each adapter is built from the agent's documentation:
+
+- Codex CLI: template `integrations/codex/hooks.json`. Copy it to `.codex/hooks.json` with the guard scripts, then trust
+  the hook with `/hooks`.
+- Windsurf/Devin: template `integrations/windsurf/hooks.json`. Copy it to `.devin/hooks.json` with the guard scripts.
+- Gemini CLI: template `integrations/gemini/settings.json` (`settings.windows.json` on Windows). Merge its hooks into
+  `.gemini/settings.json` and copy the guard scripts to `.gemini/`.
+
+No adapter yet, waiting for a captured event:
+
+- GitHub Copilot: the argument names of its write tools are undocumented.
+- Cursor: the `Write` tool's input shape is undocumented.
+- Kiro: the write tool's input shape is undocumented, and it differs between versions.
+- Antigravity: its exit codes are undocumented, so how to block a write is unknown.
+
+To help with one, set `AGENT_COMMENT_LINT_CAPTURE` to a file and register `integrations/capture/capture-event.sh`
+(`.cmd` on Windows) as the agent's hook. It appends each event to that file and never blocks.
+Details for each adapter are in [the reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#other-coding-agents).
+
 ### GitHub Actions
 
 ```yaml
@@ -89,7 +114,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: OrodruinLabs/agent-comment-lint@v1.3.0
+      - uses: OrodruinLabs/agent-comment-lint@v1.4.0
 ```
 
 Only the lines the pull request changes are checked. Keep `fetch-depth: 0`, or the step cannot see what changed and
@@ -101,7 +126,7 @@ lists them all. The inputs are in [the reference](https://github.com/OrodruinLab
 ```yaml
 repos:
   - repo: https://github.com/OrodruinLabs/agent-comment-lint
-    rev: v1.3.0
+    rev: v1.4.0
     hooks:
       - id: agent-comment-lint-staged
 ```
@@ -115,15 +140,15 @@ staged, so it judges nothing. In CI, use the GitHub Action (or `--diff`), or the
 ### Command line
 
 ```
-uv tool install agent-comment-lint==1.3.0
-pipx install agent-comment-lint==1.3.0
+uv tool install agent-comment-lint==1.4.0
+pipx install agent-comment-lint==1.4.0
 ```
 
 To install from the repository instead:
 
 ```
-uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.3.0
-pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.3.0
+uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.4.0
+pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.4.0
 ```
 
 `uvx agent-comment-lint` runs it without installing, which suits CI and trials.
@@ -154,7 +179,7 @@ are no limits to change and no way to silence one comment inline. Every entry st
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.3.0/schema/agent-comment-lint.schema.json",
+  "$schema": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.4.0/schema/agent-comment-lint.schema.json",
   "exclude": [{ "path": "vendor/", "reason": "third-party code" }],
   "governance": {
     "packs": ["azure-boards"],
