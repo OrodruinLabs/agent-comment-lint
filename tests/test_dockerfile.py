@@ -101,5 +101,72 @@ class TestHeredocs(unittest.TestCase):
         self.assertEqual(caught.exception.line, 1)
 
 
+class TestHeredocWords(unittest.TestCase):
+    def test_a_shift_in_shell_arithmetic_opens_nothing(self):
+        self.assertEqual(found("Dockerfile", "FROM x\nRUN echo $((a << b)) $((c << d))\n"), [])
+
+    def test_a_space_after_the_marker_opens_nothing(self):
+        self.assertEqual(found("Dockerfile", "RUN cat << EOF > /x\n# one\n# see ADR-9\n"), [("C1", 2), ("C3", 3)])
+
+    def test_a_marker_inside_a_word_opens_nothing(self):
+        self.assertEqual(found("Dockerfile", "RUN a<<EOF\n# see ADR-9\n"), [("C3", 2)])
+        self.assertEqual(found("Dockerfile", 'RUN echo "x"<<EOF\n# see ADR-9\n'), [("C3", 2)])
+
+    def test_a_dash_marker_alone_opens_nothing(self):
+        self.assertEqual(found("Dockerfile", "RUN cat <<-\n# see ADR-9\n"), [("C3", 2)])
+
+    def test_a_name_after_a_dash_marker_may_start_with_a_dash(self):
+        self.assertEqual(found("Dockerfile", "RUN cat <<--X\n# see ADR-9\n\t-X\n# see ADR-8\n"), [("C3", 4)])
+
+    def test_a_name_with_hyphens_or_dots_is_one_name(self):
+        self.assertEqual(found("Dockerfile", "RUN <<END-OF-FILE\n# x\nEND-OF-FILE\n"), [])
+        self.assertEqual(found("Dockerfile", "RUN <<eof.sh\n# x\neof.sh\n"), [])
+
+    def test_a_file_descriptor_may_come_before_the_marker(self):
+        self.assertEqual(found("Dockerfile", "RUN 3<<EOF\n# x\nEOF\n"), [])
+
+    def test_a_quoted_name_is_unquoted(self):
+        self.assertEqual(found("Dockerfile", "RUN cat <<'EOF' <<\"X\"\n# a\nEOF\n# b\nX\n# see ADR-9\n"), [("C3", 6)])
+
+    def test_quotes_protect_whitespace_from_ending_a_word(self):
+        self.assertEqual(found("Dockerfile", "RUN echo 'a <<EOF'\n# see ADR-9\n"), [("C3", 2)])
+
+    def test_a_marker_after_an_escaped_quote_is_a_word(self):
+        self.assertEqual(found("Dockerfile", 'RUN echo \\" <<EOF\n# x\nEOF\n# see ADR-9\n'), [("C3", 4)])
+
+    def test_a_marker_after_a_hash_on_an_instruction_still_opens(self):
+        self.assertEqual(found("Dockerfile", "RUN echo # <<EOF\n# see ADR-1\nEOF\n# see ADR-9\n"), [("C3", 4)])
+
+    def test_a_marker_on_a_continued_line_without_a_space_before_the_escape_opens(self):
+        self.assertEqual(found("Dockerfile", "RUN cat <<EOF\\\n  > /x\n# x\nEOF\n# see ADR-9\n"), [("C3", 5)])
+
+    def test_a_word_carried_over_a_continuation_is_not_a_word_start(self):
+        self.assertEqual(found("Dockerfile", "RUN cat a\\\n<<EOF\n# see ADR-9\n"), [("C3", 3)])
+
+    def test_an_unterminated_heredoc_on_a_continued_line_reports_that_line(self):
+        with self.assertRaises(LexError) as caught:
+            family_for("Dockerfile").lex("RUN a \\\n  <<A \\\n  <<B\nA\n")
+        self.assertEqual(caught.exception.line, 3)
+
+    def test_a_quote_carried_over_a_continuation_protects_the_marker(self):
+        text = 'RUN echo "a \\\n  <<EOF b" > /x\n# see ADR-9\n'
+        self.assertEqual(found("Dockerfile", text), [("C3", 3)])
+
+
+class TestHeredocTerminators(unittest.TestCase):
+    def test_an_indented_terminator_is_payload(self):
+        self.assertEqual(found("Dockerfile", "RUN <<EOF\necho\n  EOF\n# see ADR-7\nEOF\n"), [])
+
+    def test_a_terminator_with_trailing_space_is_payload(self):
+        self.assertEqual(found("Dockerfile", "RUN <<EOF\necho\nEOF \n# see ADR-7\nEOF\n"), [])
+
+    def test_a_dash_heredoc_strips_only_tabs(self):
+        self.assertEqual(found("Dockerfile", "RUN <<-EOF\n\t\tEOF\n# see ADR-7\n"), [("C3", 3)])
+        self.assertEqual(found("Dockerfile", "RUN <<-EOF\n  EOF\n# see ADR-7\nEOF\n"), [])
+
+    def test_a_crlf_terminator_closes(self):
+        self.assertEqual(found("Dockerfile", "RUN <<EOF\r\n# x\r\nEOF\r\n# see ADR-7\r\n"), [("C3", 4)])
+
+
 if __name__ == "__main__":
     unittest.main()

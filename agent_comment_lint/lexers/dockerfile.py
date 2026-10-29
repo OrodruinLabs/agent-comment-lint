@@ -1,26 +1,52 @@
 """Dockerfile: a line is a comment only when `#` is its first non-blank character; heredoc payload is content."""
 import re
+from bisect import bisect_right
+from itertools import accumulate
 
 from .base import CODE, COMMENT, STRING, Family, LexError, Line
-from .hashlike import HASH_ONLY, HEREDOC_START, _is_shift
-from .linescan import live_code_hit
+from .hashlike import HASH_ONLY
 
 # Docker reads these only above the first comment, blank line or instruction.
 DIRECTIVE = re.compile(r"\s*#\s*(syntax|escape|check)\s*=\s*(.*?)\s*$", re.IGNORECASE)
 HEREDOC_INSTRUCTIONS = ("RUN", "COPY", "ADD")
+# A whole word: digits, `<<`, a `-` that is never given back to the name (as in BuildKit), then the name, maybe quoted.
+HEREDOC_WORD = re.compile(r"\d*<<(?=(-?))\1(['\"]?)((?a:[\w.-]+))\2")
 
 
-def _heredoc_openers(raw):
-    """(terminator, strips_tabs) for every heredoc opened on this line, in order."""
+def _words(text):
+    """(start, end) of each shell word: quotes protect whitespace, and a backslash outside single quotes escapes."""
+    spans = []
+    start = quote = None
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if quote or not ch.isspace():
+            start = i if start is None else start
+            if quote and ch == quote:
+                quote = None
+            elif ch == "\\" and quote != "'":
+                i += 1
+            elif not quote and ch in "'\"":
+                quote = ch
+        elif start is not None:
+            spans.append((start, i))
+            start = None
+        i += 1
+    if start is not None:
+        spans.append((start, len(text)))
+    return spans
+
+
+def _heredoc_openers(parts):
+    """(terminator, strips_tabs, line) for every heredoc a word of the joined (line, text) parts opens, in order."""
+    text = "".join(part for _, part in parts)
+    ends = list(accumulate(len(part) for _, part in parts))
     openers = []
-    masked = raw
-    while True:
-        hit = live_code_hit(masked, HEREDOC_START, hash_marker=True, slash_marker=False)
-        if hit is None:
-            return openers
-        if not _is_shift(masked, hit):
-            openers.append((hit.group(2), hit.group().startswith("<<-")))
-        masked = " " * hit.end() + masked[hit.end():]
+    for start, end in _words(text):
+        hit = HEREDOC_WORD.fullmatch(text, start, end)
+        if hit:
+            openers.append((hit.group(3), hit.group(1) == "-", parts[bisect_right(ends, start)][0]))
+    return openers
 
 
 def _instruction_word(stripped):
@@ -44,12 +70,14 @@ def lex(text):
     directives = True
     continuing = False
     heredocs_allowed = False
+    parts = []
     pending = []
     active = None
     for number, raw in enumerate(text.splitlines(), 1):
         if active is not None:
             word, strips_tabs, _ = active
-            closes = (raw.lstrip("\t") if strips_tabs else raw).strip() == word
+            # As in BuildKit, only the line break goes, and for `<<-` the leading tabs; then the match is exact.
+            closes = (raw.lstrip("\t") if strips_tabs else raw) == word
             out.append(Line([(CODE, raw)], CODE if closes else STRING))
             if closes:
                 active = pending.pop(0) if pending else None
@@ -70,11 +98,13 @@ def lex(text):
             continue
         if not continuing:
             heredocs_allowed = _instruction_word(stripped) in HEREDOC_INSTRUCTIONS
-        if heredocs_allowed:
-            pending.extend((word, strips_tabs, number) for word, strips_tabs in _heredoc_openers(raw))
+            parts = []
         continuing = stripped.endswith(escape)
-        if not continuing and pending:
-            active = pending.pop(0)
+        # BuildKit reads the heredoc words of the whole instruction, its lines joined where the escapes were.
+        parts.append((number, raw.rstrip()[:-1] if continuing else raw))
+        if not continuing and heredocs_allowed:
+            pending = _heredoc_openers(parts)
+            active = pending.pop(0) if pending else None
     if active is not None:
         raise LexError(active[2], "unterminated heredoc <<%s: no closing line before end of file" % active[0])
     return out
