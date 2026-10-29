@@ -171,7 +171,8 @@ def snapshot_tree(root, paths):
             raise GitError("the temporary index could not be made: %s" % (error.strerror or error))
 
         def scratch_git(*args, input=None):
-            env = {"GIT_INDEX_FILE": scratch}
+            # The `:/` below is pathspec magic, which a user's GIT_LITERAL_PATHSPECS would read as a file name.
+            env = {"GIT_INDEX_FILE": scratch, "GIT_LITERAL_PATHSPECS": "0"}
             return _git_bytes(root, *args, env=env, input=input, settings=SCRATCH_INDEX_SETTINGS)
 
         listing = "".join(path + "\0" for path in paths).encode("utf-8")

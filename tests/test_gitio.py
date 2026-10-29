@@ -198,6 +198,12 @@ class TestRepository(unittest.TestCase):
         tree = gitio.snapshot_tree(sub, ["c.ts"])
         self.assertEqual(gitio.blob(sub, tree + ":./c.ts"), b"const c = 2;\n")
 
+    def test_a_snapshot_mid_merge_finds_the_conflicts_when_the_user_asks_for_literal_pathspecs(self):
+        self.conflicted()
+        with mock.patch.dict(os.environ, {"GIT_LITERAL_PATHSPECS": "1"}):
+            tree = gitio.snapshot_tree(self.tmp, ["b.ts"])
+        self.assertEqual(gitio.blob(self.tmp, tree + ":b.ts"), b"resolved\n")
+
     def shared_indexes(self):
         return sorted(name for name in os.listdir(os.path.join(self.tmp, ".git")) if name.startswith("sharedindex."))
 
