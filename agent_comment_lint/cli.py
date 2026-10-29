@@ -22,6 +22,7 @@ BINARY_NOT_TEXT = "git shows no changed lines for it (a binary file) and it is n
 HOOK_INPUT = "standard input is not a Claude Code hook event: %s"
 HOOK_NOT_UTF8 = "is not UTF-8 text, so the write cannot be judged"
 SESSION_NOT_UTF8 = "is not UTF-8 text, so the lines this session changed cannot be judged"
+STAGED_UNMERGED = "is unmerged, so its staged lines cannot be judged"
 HOOK_BLOCKED = "Blocked: agent-comment-lint rejects this write.\n"
 HOOK_HEADER = HOOK_BLOCKED + report.HOOK_SCOPE
 STOP_FOUND = ("Before you finish: agent-comment-lint found comments that break the policy in what changed during this "
@@ -303,6 +304,10 @@ def _run_changes(run, root, config, span, from_blobs=False, not_utf8=None, also=
         for path, (_blob, ranges) in changed.items():
             run.judge_file(root, path, ranges, errors="strict" if ranges is None else "replace")
         return
+    # Git names a null blob for a path still unmerged in the index, and asking for it would fail every other path.
+    unmerged = [path for path, (blob, _ranges) in changed.items() if not blob.strip("0")]
+    run.errors.extend((path, None, STAGED_UNMERGED) for path in unmerged)
+    changed = {path: change for path, change in changed.items() if path not in unmerged}
     try:
         blobs = gitio.read_blobs(root, [blob for blob, _ranges in changed.values()])
     except gitio.GitError as error:

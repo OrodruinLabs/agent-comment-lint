@@ -643,6 +643,24 @@ class TestStagedMode(Sandbox):
         self.assertEqual((code, out), (2, ""))
         self.assertIn("a.ts: could not scan: no blob", err)
 
+    def test_an_unmerged_path_cannot_be_scanned_and_the_other_staged_paths_are_still_judged(self):
+        self.write("a.ts", "const a = 0;\n")
+        self.commit("base")
+        self.git("checkout", "-q", "-b", "other")
+        self.write("a.ts", "const a = 1;\n")
+        self.commit("other")
+        self.git("checkout", "-q", "-")
+        self.write("a.ts", "const a = 2;\n")
+        self.commit("mine")
+        subprocess.run(["git", "merge", "-q", "other"], cwd=self.tmp, capture_output=True)
+        self.write("c.ts", "// one\n// two\n")
+        self.git("add", "c.ts")
+        code, out, err = self.run_cli("--staged")
+        self.assertEqual(code, 2)
+        self.assertIn("c.ts:1: C1:", out)
+        self.assertIn("a.ts: could not scan: " + cli.STAGED_UNMERGED, err)
+        self.assertNotIn("c.ts: could not scan", err)
+
     def test_the_blobs_are_read_in_a_number_of_git_calls_that_does_not_grow_with_the_files(self):
         def git_calls(count):
             for index in range(count):
