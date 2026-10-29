@@ -84,6 +84,7 @@ class TestHookWrapper(unittest.TestCase):
         done = self.run_wrapper(CLEAN, AGENT_COMMENT_LINT_PYTHON="no-such-python-3")
         self.assertEqual(done.returncode, 2)
         self.assertIn(b"Blocked:", done.stderr)
+        self.assertIn(b"AGENT_COMMENT_LINT_PYTHON=no-such-python-3", done.stderr)
 
     def test_a_project_directory_that_does_not_exist_is_blocked_with_two(self):
         done = self.run_wrapper(CLEAN, CLAUDE_PROJECT_DIR="/no/such/directory")
@@ -92,6 +93,15 @@ class TestHookWrapper(unittest.TestCase):
     def test_an_interpreter_older_than_3_9_is_passed_over_for_the_next(self):
         with tempfile.TemporaryDirectory() as tmp:
             bin_dir = fake_bin(tmp, python3="exit 1", python='exec "%s" "$@"' % sys.executable)
+            done = self.run_wrapper(DIRTY, AGENT_COMMENT_LINT_PYTHON="",
+                                    PATH=bin_dir + os.pathsep + os.environ["PATH"])
+        self.assertEqual(done.returncode, 2)
+        self.assertIn(b"x.ts:1: C1: 2-line prose block (limit 1)", done.stderr)
+
+    def test_the_py_launcher_is_the_last_resort(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            launcher = '[ "$1" = "-3" ] || exit 1; shift; exec "%s" "$@"' % sys.executable
+            bin_dir = fake_bin(tmp, python3="exit 1", python="exit 1", py=launcher)
             done = self.run_wrapper(DIRTY, AGENT_COMMENT_LINT_PYTHON="",
                                     PATH=bin_dir + os.pathsep + os.environ["PATH"])
         self.assertEqual(done.returncode, 2)
