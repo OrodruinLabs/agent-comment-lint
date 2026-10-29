@@ -71,7 +71,8 @@ changes your results without a commit of yours.
 /plugin install agent-comment-lint@agent-comment-lint
 ```
 
-Needs `python3` on `PATH`. A write that adds a bad comment is blocked, and Claude sees why. Old comments the write
+macOS, Linux and Windows are supported. The plugin finds Python as `AGENT_COMMENT_LINT_PYTHON`, `python3`, `python`,
+then `py -3`. A write that adds a bad comment is blocked, and Claude sees why. Old comments the write
 leaves alone never block it. To turn it on for a whole team, see [Claude Code setup](docs/reference.md#claude-code).
 
 ### GitHub Actions

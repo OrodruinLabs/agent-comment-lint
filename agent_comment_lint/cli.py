@@ -119,7 +119,7 @@ def _resolved_inside(root, directory, path):
     """The real path of `path` taken from `directory`; None when it lands outside the root."""
     resolved = os.path.realpath(os.path.join(directory, path))
     try:
-        inside = os.path.commonpath([root, resolved]) == root
+        inside = os.path.normcase(os.path.commonpath([root, resolved])) == os.path.normcase(root)
     except ValueError:
         # Paths on two drives, or under a UNC root and a drive, share no part at all.
         inside = False

@@ -894,6 +894,11 @@ class TestHookMode(Sandbox):
         for text in expected:
             self.assertIn(text, err)
 
+    @unittest.skipUnless(os.name == "nt", "drive letters and case-insensitive paths are Windows behaviour")
+    def test_a_windows_path_in_another_case_and_separator_is_judged(self):
+        path = os.path.join(self.tmp, "a.ts").upper().replace("\\", "/")
+        self.assert_blocked(self.hook(event("Write", path, content="// one\n// two\n")), ":1: C1:")
+
     def test_a_new_finding_in_the_edit_blocks_it(self):
         self.write("a.ts", "const a = 1;\n")
         result = self.hook(event("Edit", "a.ts", old_string="const a = 1;\n",

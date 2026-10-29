@@ -23,8 +23,9 @@ the lexers can and cannot tell apart. The [README](../README.md) covers the basi
 
 ### Claude Code
 
-The plugin registers a PreToolUse hook on `Write`, `Edit` and `MultiEdit`. It needs `python3` on `PATH`, or the
-interpreter named by `AGENT_COMMENT_LINT_PYTHON`. A write that adds a finding is blocked, and Claude sees the report.
+The plugin registers a PreToolUse hook on `Write`, `Edit` and `MultiEdit`. It runs on macOS, Linux and Windows. It
+looks for Python as `AGENT_COMMENT_LINT_PYTHON` (when set, the only candidate), then `python3`, `python` and `py -3`,
+and takes the first that is Python 3.9 or newer. With none, the write is blocked with exit 2. A write that adds a finding is blocked, and Claude sees the report.
 Writes that only keep old findings go through.
 
 On Claude Code 2.1.275 or later one line installs it:
@@ -144,7 +145,7 @@ agent-comment-lint --version             # the installed version
 ```
 
 Without an install, `python3 check-agent-comment-lint.py` from a checkout takes the same arguments, and so does
-`python3 -m agent_comment_lint`.
+`python3 -m agent_comment_lint`. On Windows, use `py -3` or `python` for `python3`.
 
 | Mode | What it judges |
 | --- | --- |

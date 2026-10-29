@@ -25,11 +25,13 @@ runs:
       run: |
         set -u
         script="$GITHUB_ACTION_PATH/check-agent-comment-lint.py"
+        py=$(command -v python3 || command -v python) || py=
+        [ -n "$py" ] || { echo "agent-comment-lint: no Python on PATH" >&2; exit 2; }
         case "$MODE" in
-          all) exec python3 "$script" --all $ARGS ;;
+          all) exec "$py" "$script" --all $ARGS ;;
           diff)
             base=${BASE:-${TARGET:+origin/$TARGET}}
             [ -n "$base" ] || { echo "agent-comment-lint: set the base input outside a pull request" >&2; exit 2; }
-            exec python3 "$script" --diff "$base" $ARGS ;;
+            exec "$py" "$script" --diff "$base" $ARGS ;;
           *) echo "agent-comment-lint: mode must be diff or all, not $MODE" >&2; exit 2 ;;
         esac

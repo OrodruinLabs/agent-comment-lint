@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WRAPPER = os.path.join(REPO, "hooks", "agent-comment-lint-hook.sh")
 DIRTY = json.dumps({"tool_name": "Write", "tool_input": {"file_path": "x.ts", "content": "// one\n// two\n"}})
 CLEAN = json.dumps({"tool_name": "Write", "tool_input": {"file_path": "x.ts", "content": "const a = 1;\n"}})
+SHELL = shutil.which("sh") or shutil.which("bash")
 
 
 def load(*parts):
@@ -42,13 +44,25 @@ class TestManifests(unittest.TestCase):
         self.assertTrue(re.fullmatch(entry["matcher"], "Edit") and re.fullmatch(entry["matcher"], "Write"))
 
 
-@unittest.skipIf(sys.platform == "win32", "the wrapper is a POSIX shell script")
+def fake_bin(tmp, **scripts):
+    """A directory holding one executable `#!/bin/sh` script per keyword, named after it."""
+    for name, body in scripts.items():
+        path = os.path.join(tmp, name)
+        with open(path, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write("#!/bin/sh\n%s\n" % body)
+        os.chmod(path, 0o755)
+    return tmp
+
+
+@unittest.skipUnless(SHELL, "no POSIX shell on PATH")
 class TestHookWrapper(unittest.TestCase):
     def run_wrapper(self, stdin, **environment):
         with tempfile.TemporaryDirectory() as tmp:
             env = dict(os.environ, CLAUDE_PROJECT_DIR=os.path.realpath(tmp), AGENT_COMMENT_LINT_PYTHON=sys.executable)
             env.update(environment)
-            return subprocess.run(["sh", WRAPPER], input=stdin.encode("utf-8"), capture_output=True, env=env)
+            if env["AGENT_COMMENT_LINT_PYTHON"] == "":
+                del env["AGENT_COMMENT_LINT_PYTHON"]
+            return subprocess.run([SHELL, WRAPPER], input=stdin.encode("utf-8"), capture_output=True, env=env)
 
     def test_a_clean_write_passes_silently(self):
         done = self.run_wrapper(CLEAN)
@@ -67,3 +81,19 @@ class TestHookWrapper(unittest.TestCase):
     def test_a_project_directory_that_does_not_exist_is_blocked_with_two(self):
         done = self.run_wrapper(CLEAN, CLAUDE_PROJECT_DIR="/no/such/directory")
         self.assertEqual(done.returncode, 2)
+
+    def test_an_interpreter_older_than_3_9_is_passed_over_for_the_next(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bin_dir = fake_bin(tmp, python3="exit 1", python='exec "%s" "$@"' % sys.executable)
+            done = self.run_wrapper(DIRTY, AGENT_COMMENT_LINT_PYTHON="",
+                                    PATH=bin_dir + os.pathsep + os.environ["PATH"])
+        self.assertEqual(done.returncode, 2)
+        self.assertIn(b"x.ts:1: C1: 2-line prose block (limit 1)", done.stderr)
+
+    def test_no_usable_interpreter_is_blocked_with_two(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bin_dir = fake_bin(tmp, python3="exit 1", python="exit 1", py="exit 1")
+            done = self.run_wrapper(CLEAN, AGENT_COMMENT_LINT_PYTHON="",
+                                    PATH=bin_dir + os.pathsep + os.environ["PATH"])
+        self.assertEqual(done.returncode, 2)
+        self.assertIn(b"Blocked: agent-comment-lint needs Python 3.9 or newer on PATH.", done.stderr)
