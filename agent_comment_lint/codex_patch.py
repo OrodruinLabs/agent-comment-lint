@@ -15,6 +15,8 @@ EMPTY_ANCHOR = "@@"
 HEREDOCS = ("<<EOF", "<<'EOF'", '<<"EOF"')
 UNEXPECTED = ("Unexpected line found in update hunk: '%s'. Every line should start with ' ' (context line), '+' "
               "(added line), or '-' (removed line)")
+NOT_FIRST = "The first line of the patch must be '%s'" % BEGIN
+NOT_LAST = "The last line of the patch must be '%s'" % END
 NOT_A_HEADER = ("'%s' is not a valid hunk header. Valid hunk headers: '*** Add File: {path}', '*** Delete File: "
                 "{path}', '*** Update File: {path}'")
 # Rust's whitespace: str.strip would also drop the separators \x1c to \x1f.
@@ -47,9 +49,9 @@ def _chomp(line):
 def _bounded(lines):
     """Raises unless the lines open with Begin Patch and close with End Patch."""
     if not lines or _trim(lines[0]) != BEGIN:
-        raise PatchError("The first line of the patch must be '%s'" % BEGIN)
+        raise PatchError(NOT_FIRST)
     if _trim(lines[-1]) != END:
-        raise PatchError("The last line of the patch must be '%s'" % END)
+        raise PatchError(NOT_LAST)
 
 
 def _patch_lines(text):
@@ -57,6 +59,7 @@ def _patch_lines(text):
     trimmed = _trim(text)
     lines = [_chomp(line) for line in trimmed.split("\n")] if trimmed else []
     try:
+        # Codex checks both ends before it parses, so a missing end is named before any fault inside.
         _bounded(lines)
         return lines
     except PatchError:
@@ -134,11 +137,11 @@ class _Parser:
         trimmed = _trim(line)
         if self.mode == "start":
             if trimmed != BEGIN:
-                raise PatchError("The first line of the patch must be '%s'" % BEGIN)
+                raise PatchError(NOT_FIRST)
             self.mode = "patch"
         elif self.mode == "ended":
             if trimmed:
-                raise PatchError("The last line of the patch must be '%s'" % END)
+                raise PatchError(NOT_LAST)
         elif self.mode == "update":
             self._update(line)
         elif not self._header(trimmed):
@@ -190,7 +193,7 @@ class _Parser:
         else:
             self.line(line)
         if self.mode != "ended":
-            raise PatchError("The last line of the patch must be '%s'" % END)
+            raise PatchError(NOT_LAST)
 
     def parsed(self):
         return [CodexFile(found.kind, found.path, found.move_to,
@@ -205,6 +208,7 @@ def parse_patch(text):
     lines = _patch_lines(text)
     parser = _Parser()
     for line in lines[:-1]:
+        # Codex's streaming parser strips one more carriage return from every line but the last.
         parser.line(_chomp(line))
     parser.finish(lines[-1])
     return parser.parsed()

@@ -205,6 +205,14 @@ class TestCodexPatchParser(unittest.TestCase):
         text = patch("*** Update File: a.py", "@@", " keep", "-x", "+y").replace("\n", "\r\n")
         self.assertEqual(hook.parse_codex_patch(text), self.parse("*** Update File: a.py", "@@", " keep", "-x", "+y"))
 
+    def test_a_line_ending_in_two_carriage_returns_loses_both_as_in_codex(self):
+        self.assertEqual(hook.parse_codex_patch("*** Begin Patch\n*** Add File: a.py\n+x\r\r\n+y\r\n*** End Patch"),
+                         [codex_patch.CodexFile("add", "a.py", None, "x\ny\n", None)])
+
+    def test_a_missing_end_is_named_before_a_bad_line_inside_as_in_codex(self):
+        with self.assertRaisesRegex(hook.HookInputError, "The last line of the patch must be '\\*\\*\\* End Patch'"):
+            hook.parse_codex_patch("*** Begin Patch\n*** Frobnicate: a.py\nmore")
+
     def test_markers_may_carry_surrounding_whitespace(self):
         text = "\n  *** Begin Patch  \n  *** Add File: a.py  \n+a\n  *** End Patch  \n\n"
         self.assertEqual(hook.parse_codex_patch(text), [codex_patch.CodexFile("add", "a.py", None, "a\n", None)])
