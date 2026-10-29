@@ -109,6 +109,25 @@ def _load_config(args, root, cwd):
     return settings.parse(text)
 
 
+def _load_hook_config(args, root, cwd):
+    """The settings as committed at HEAD, so an agent's own edit cannot excuse its write; disk where HEAD has none."""
+    if args.config:
+        return _load_config(args, root, cwd)
+    try:
+        gitio.toplevel(root)
+    except gitio.GitError:
+        return _load_config(args, root, cwd)
+    if not gitio.has_head(root):
+        return _load_config(args, root, cwd)
+    data = gitio.committed_blob(root, settings.CONFIG_NAME)
+    if data is None:
+        return settings.EMPTY
+    try:
+        return settings.parse(data.decode(ENCODING))
+    except UnicodeDecodeError:
+        raise settings.ConfigError("is not UTF-8 text")
+
+
 def _judged(config, path):
     return (engine.in_scope(path) and not settings.skipped_by_default(path)
             and not settings.excluded(config, path))
@@ -383,7 +402,7 @@ def _execute(args, cwd, stdin):
         root, listed_by_git = _root(args, cwd, run.mode)
         if run.mode == "hook":
             # A write the hook never judges must not depend on the settings file.
-            _run_hook(run, root, cwd, lambda judged_root: _load_config(args, judged_root, cwd), stdin,
+            _run_hook(run, root, cwd, lambda judged_root: _load_hook_config(args, judged_root, cwd), stdin,
                       follow_worktrees=not args.root)
             return run
         config = _load_config(args, root, cwd)

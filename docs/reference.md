@@ -246,6 +246,10 @@ entry states its reason:
 }
 ```
 
+The write-time hook and the end-of-session check read the file as committed at HEAD, so an exclusion an agent adds
+reaches them only after a human commits it. Outside git, before the first commit, and with `--config`, they read the
+file on disk. Every other mode reads it from disk.
+
 - `$schema` is optional and ignored by the check. It lets editors validate and complete the file.
 - `exclude[].path` is relative to the repository root. `*` and `?` match inside one directory, `**` crosses
   directories, and a final `/` takes the whole tree.
@@ -306,6 +310,9 @@ accident.
 `--hook` reads the event Claude Code sends a PreToolUse hook. The file the write would leave is judged whole, and a
 finding counts only where it overlaps a line the write adds or changes.
 
+- The settings come from the file as committed at HEAD in the judged root, not from the working tree, so adding an
+  exclusion does not excuse the write that prompted it. A committed file that is malformed or not UTF-8 is exit code
+  2. Outside git, before the first commit, and with `--config`, the file on disk is read.
 - The report on standard error quotes each offending comment and says how to fix it, then closes with what not to
   try. A `Write` also gets a line telling it to re-send with only the comment lines changed. For example:
 
@@ -319,7 +326,7 @@ finding counts only where it overlaps a line the write adds or changes.
   agent-comment-lint: 1 violation(s) in 1 of 1 file(s) scanned.
   Fix the comment and retry the same tool call.
   Splitting the comment across blank lines, or writing the file another way (Bash, a script, another tool), does not satisfy the policy.
-  Adding an exclusion to .agent-comment-lint.json is not the fix: exclusions are for generated and third-party code.
+  Adding an exclusion to .agent-comment-lint.json is not the fix: exclusions are for generated and third-party code, and a new one has no effect here until a human commits it.
   ```
 
   An excerpt shows at most 6 lines of the comment, each cut at 120 characters.

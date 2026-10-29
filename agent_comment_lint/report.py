@@ -21,8 +21,8 @@ HOOK_CLOSING = (
     "Fix the comment and retry the same tool call.",
     "Splitting the comment across blank lines, or writing the file another way (Bash, a script, another tool), "
     "does not satisfy the policy.",
-    "Adding an exclusion to .agent-comment-lint.json is not the fix: "
-    "exclusions are for generated and third-party code.",
+    "Adding an exclusion to .agent-comment-lint.json is not the fix: exclusions are for generated and "
+    "third-party code, and a new one has no effect here until a human commits it.",
 )
 WRITE_RETRY = "Re-send this Write with only the comment lines changed."
 

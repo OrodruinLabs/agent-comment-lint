@@ -160,6 +160,9 @@ are no limits to change and no way to silence one comment inline. Every entry st
 }
 ```
 
+The Claude Code hook and the end-of-session check read this file as committed, so a new exclusion reaches them once a
+human commits it. Outside git, before the first commit, and with `--config`, they read the file on disk.
+
 ### Reference packs
 
 C3 always refuses the common shapes shown in [What it checks](#what-it-checks). A pack adds the reference shapes of

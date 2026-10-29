@@ -1123,6 +1123,8 @@ class TestHookMode(Sandbox):
         self.git("worktree", "add", "-q", worktree, "-b", "task")
         with open(os.path.join(worktree, ".agent-comment-lint.json"), "w", encoding="utf-8") as handle:
             handle.write('{"exclude": [{"path": "gen/", "reason": "generated"}]}')
+        subprocess.run(["git", "add", "-A"], cwd=worktree, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "exclude gen"], cwd=worktree, check=True)
         prose = "// one\n// two\nconst a = 1;\n"
         self.assert_blocked(self.hook(event("Write", os.path.join(worktree, "src", "new", "b.ts"), content=prose)),
                             "src/new/b.ts:1: C1:")
@@ -1209,6 +1211,45 @@ def session_event(name, session_id="s1", **extra):
     return json.dumps(dict({"hook_event_name": name, "session_id": session_id}, **extra))
 
 
+class TestHookCommittedSettings(Sandbox):
+    EXCLUDE_A = '{"exclude": [{"path": "a.ts", "reason": "generated"}]}'
+
+    def setUp(self):
+        super().setUp()
+        self.init_repo()
+        self.write("a.ts", "const a = 1;\n")
+        self.commit("clean")
+
+    def dirty_write(self):
+        return self.run_cli("--hook", stdin=event("Write", "a.ts", content="// one\n// two\n"))
+
+    def test_an_uncommitted_exclusion_does_not_let_a_violation_through(self):
+        self.write(".agent-comment-lint.json", self.EXCLUDE_A)
+        self.assertEqual(self.dirty_write()[0], 2)
+
+    def test_a_committed_exclusion_does(self):
+        self.write(".agent-comment-lint.json", self.EXCLUDE_A)
+        self.commit("exclude a.ts")
+        self.assertEqual(self.dirty_write(), (0, "", ""))
+
+    def test_a_committed_settings_file_that_is_malformed_blocks_whatever_is_on_disk(self):
+        self.write(".agent-comment-lint.json", '{"limits": {}}')
+        self.commit("bad settings")
+        self.write(".agent-comment-lint.json", "{}")
+        self.assertEqual(self.dirty_write()[0], 2)
+
+    def test_before_the_first_commit_the_file_on_disk_is_read(self):
+        self.git("update-ref", "-d", "HEAD")
+        self.write(".agent-comment-lint.json", self.EXCLUDE_A)
+        self.assertEqual(self.dirty_write(), (0, "", ""))
+
+    def test_an_explicit_config_is_read_from_disk(self):
+        self.write("cfg.json", self.EXCLUDE_A)
+        result = self.run_cli("--hook", "--config", "cfg.json",
+                              stdin=event("Write", "a.ts", content="// one\n// two\n"))
+        self.assertEqual(result, (0, "", ""))
+
+
 class TestSessionHooks(Sandbox):
     def setUp(self):
         super().setUp()
@@ -1232,6 +1273,12 @@ class TestSessionHooks(Sandbox):
         self.assertEqual((code, out), (2, ""))
         self.assertTrue(err.startswith("Before you finish:"), err)
         self.assertIn("b.ts:1: C1: 2-line prose block (limit 1)", err)
+
+    def test_an_uncommitted_exclusion_does_not_stop_the_stop_check_from_blocking(self):
+        self.start()
+        self.write("b.ts", "// one\n// two\n")
+        self.write(".agent-comment-lint.json", '{"exclude": [{"path": "b.ts", "reason": "generated"}]}')
+        self.assertEqual(self.stop()[0], 2)
 
     def test_a_violation_that_predates_the_session_does_not_block(self):
         self.write("old.ts", "// one\n// two\n")
