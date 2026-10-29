@@ -54,6 +54,13 @@ class TestManifests(unittest.TestCase):
             self.assertFalse(any("onFailure" in hook for hook in commands), event)
         self.assertEqual([entry["matcher"] for entry in hooks["PreToolUse"]], ["Write|Edit|MultiEdit"])
 
+    def test_session_start_adds_two_lines_of_static_guidance(self):
+        commands = [hook["command"] for entry in load("hooks", "hooks.json")["hooks"]["SessionStart"]
+                    for hook in entry["hooks"]]
+        self.assertIn('cat "${CLAUDE_PLUGIN_ROOT}/hooks/session-guidance.txt"', commands)
+        with open(os.path.join(REPO, "hooks", "session-guidance.txt"), encoding="utf-8") as handle:
+            self.assertEqual(len(handle.read().splitlines()), 2)
+
 
 class TestVersionPins(unittest.TestCase):
     def test_every_version_pin_in_the_docs_and_schema_is_the_package_version(self):
@@ -96,6 +103,7 @@ class TestHookWrapper(unittest.TestCase):
         with open(os.path.join(REPO, ".gitattributes"), encoding="utf-8") as handle:
             rules = [line.split() for line in handle.read().splitlines()]
         self.assertIn(["*.sh", "text", "eol=lf"], rules)
+        self.assertIn(["*.txt", "text", "eol=lf"], rules)
 
     def test_a_clean_write_passes_silently(self):
         done = self.run_wrapper(CLEAN)

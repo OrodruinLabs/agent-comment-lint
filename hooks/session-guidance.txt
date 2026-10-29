@@ -1,0 +1,2 @@
+Comments here are at most one line and say why the code is the way it is.
+Notes for reviewers go in the commit message or the PR description, not in code.
