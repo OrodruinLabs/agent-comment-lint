@@ -172,6 +172,34 @@ class TestAction(unittest.TestCase):
             self.assertNotIn("::add-matcher::", missing.stdout)
 
 
+class TestStdioEncoding(unittest.TestCase):
+    def run_script(self, *args, stdin=None, cwd=None):
+        env = dict(os.environ, PYTHONIOENCODING="cp1252")
+        script = os.path.join(REPO, "check-agent-comment-lint.py")
+        return subprocess.run([sys.executable, script, *args], input=stdin, cwd=cwd, env=env, capture_output=True)
+
+    def test_a_non_ascii_path_is_printed_as_utf8_whatever_the_console_encoding(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.mkdir(os.path.join(tmp, "src"))
+            with open(os.path.join(tmp, "src", "\u65e5\u672c.ts"), "w", encoding="utf-8", newline="\n") as handle:
+                handle.write("// one\n// two\n")
+            done = self.run_script("--all", cwd=tmp)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn("src/\u65e5\u672c.ts:1: C1:", done.stdout.decode("utf-8"))
+        self.assertNotIn(b"Traceback", done.stderr)
+
+    def test_a_non_ascii_excerpt_in_hook_mode_is_utf8_whatever_the_console_encoding(self):
+        comment = "// " + "\u65e5" * 130
+        content = comment + "\n// two\n"
+        event = json.dumps({"tool_name": "Write", "tool_input": {"file_path": "x.ts", "content": content}})
+        with tempfile.TemporaryDirectory() as tmp:
+            done = self.run_script("--hook", stdin=event.encode("utf-8"), cwd=tmp)
+        self.assertEqual(done.returncode, 2)
+        self.assertIn(("    // " + "\u65e5" * 50)[:20], done.stderr.decode("utf-8"))
+        self.assertIn("\u2026", done.stderr.decode("utf-8"))
+        self.assertNotIn(b"Traceback", done.stderr)
+
+
 class TestRelease(unittest.TestCase):
     def test_a_release_publishes_to_pypi_through_trusted_publishing(self):
         with open(os.path.join(REPO, ".github", "workflows", "release.yml"), encoding="utf-8") as handle:

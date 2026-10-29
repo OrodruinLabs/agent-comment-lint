@@ -346,8 +346,19 @@ def _hook_verdict(run_result, texts, tool, stderr):
     return 2
 
 
+def _utf8(stream, errors):
+    """Switch a real console stream to UTF-8, so output does not depend on the Windows ANSI code page."""
+    reconfigure = getattr(stream, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(encoding="utf-8", errors=errors)
+
+
 def main(argv=None, stdin=None, stdout=None, stderr=None, cwd=None):
     """Run the check and return the exit code: 0 clean, 1 violations, 2 could not scan."""
+    if stdout is None:
+        _utf8(sys.stdout, "strict")
+    if stderr is None:
+        _utf8(sys.stderr, "backslashreplace")
     stdout = stdout or sys.stdout
     stderr = stderr or sys.stderr
     parser = _parser()
