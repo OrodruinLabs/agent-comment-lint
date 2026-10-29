@@ -42,7 +42,8 @@ To offer the plugin to everyone who opens a repository, commit this to its `.cla
 }
 ```
 
-Without the plugin, an installed command does the same job. Register this command as the PreToolUse hook. The guard
+Without the plugin, an installed command does the same job. Install it with `uv tool install agent-comment-lint==1.2.0`
+or `pipx install agent-comment-lint==1.2.0` (`uvx agent-comment-lint` is for CI and trials). Register this command as the PreToolUse hook. The guard
 turns a missing command into exit 2, because Claude Code lets a write through on any other failure:
 
 ```

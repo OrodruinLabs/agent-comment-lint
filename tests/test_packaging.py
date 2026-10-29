@@ -118,6 +118,15 @@ class TestAction(unittest.TestCase):
         self.assertIn("GITHUB_STEP_SUMMARY", text)
 
 
+class TestRelease(unittest.TestCase):
+    def test_a_release_publishes_to_pypi_through_trusted_publishing(self):
+        with open(os.path.join(REPO, ".github", "workflows", "release.yml"), encoding="utf-8") as handle:
+            text = handle.read()
+        for expected in ("environment: pypi", "id-token: write", "pypa/gh-action-pypi-publish@release/v1",
+                         "actions/upload-artifact@v4", "actions/download-artifact@v4"):
+            self.assertIn(expected, text)
+
+
 class TestSchema(unittest.TestCase):
     def test_the_schema_names_exactly_the_packs_the_code_knows(self):
         schema = load("schema", "agent-comment-lint.schema.json")

@@ -108,9 +108,18 @@ This checks each staged file whole, not only its changed lines, so fix or exclud
 ### Command line
 
 ```
+uv tool install agent-comment-lint==1.2.0
+pipx install agent-comment-lint==1.2.0
+```
+
+To install from the repository instead:
+
+```
 uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.1.0
 pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.1.0
 ```
+
+`uvx agent-comment-lint` runs it without installing, which suits CI and trials.
 
 ```
 agent-comment-lint --diff origin/main    # only what the branch changes
