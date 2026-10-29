@@ -10,7 +10,7 @@ import unittest
 
 from unittest import mock
 
-from agent_comment_lint import __version__, cli, gitio, report
+from agent_comment_lint import __version__, cli, gitio, report, session
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TWO_BLOCKS = "// one\n// two\nint x;\n// three\n// four\n"
@@ -1295,6 +1295,21 @@ class TestSessionHooks(Sandbox):
         self.start()
         with mock.patch.object(gitio, "snapshot_tree", side_effect=gitio.GitError("boom")):
             self.assertEqual(self.stop()[0], 2)
+
+    def test_any_failure_taking_the_snapshot_means_no_snapshot(self):
+        with mock.patch.object(gitio, "snapshot_tree", side_effect=ValueError("x")):
+            self.start()
+        self.write("b.ts", "// one\n// two\n")
+        self.assertEqual(self.stop(), (0, "", ""))
+
+    def test_a_planted_snapshot_is_not_passed_to_git_as_an_option(self):
+        self.start()
+        planted = os.path.join(self.tmp, "planted")
+        with open(os.path.join(gitio.git_path(self.tmp, session.SESSIONS), "s1"), "w", encoding="ascii") as handle:
+            handle.write("--output=" + planted)
+        self.write("b.ts", "// one\n// two\n")
+        self.assertEqual(self.stop(), (0, "", ""))
+        self.assertFalse(os.path.exists(planted))
 
     def test_a_subdirectory_root_reads_its_own_files(self):
         self.write("sub/a.ts", "const a = 1;\n")

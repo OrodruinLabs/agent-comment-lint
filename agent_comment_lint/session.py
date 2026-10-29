@@ -5,6 +5,7 @@ import time
 
 SESSIONS = "agent-comment-lint/sessions"
 SESSION_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+OBJECT_ID = re.compile(r"^[0-9a-f]{40}([0-9a-f]{24})?$")
 MAX_AGE_SECONDS = 7 * 24 * 3600
 
 
@@ -26,15 +27,17 @@ def record(directory, session_id, tree):
     _prune(directory)
     try:
         with open(os.path.join(directory, session_id), "x", encoding="ascii") as handle:
-            handle.write(tree)
+            handle.write(tree.strip())
     except FileExistsError:
         pass
 
 
 def recorded(directory, session_id):
-    """The tree recorded for the session; None when there is none."""
+    """The tree id recorded for the session; None when there is none or the file holds anything else."""
     try:
         with open(os.path.join(directory, session_id), encoding="ascii") as handle:
-            return handle.read().strip() or None
+            text = handle.read().strip()
     except (OSError, UnicodeDecodeError):
         return None
+    # The text reaches git as an argument, so only a full object id counts as a snapshot.
+    return text if OBJECT_ID.match(text) else None

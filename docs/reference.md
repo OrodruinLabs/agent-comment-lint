@@ -347,9 +347,10 @@ since. Both run the same wrapper and `--hook`, which dispatches on the event's `
 - The snapshot is a git tree built from a temporary index. It writes no ref, no index and nothing in the working
   tree, only git objects and a file under `git rev-parse --git-path agent-comment-lint/sessions`. Files older than
   seven days there are removed.
-- No snapshot means no check. The session ends normally when the plugin was installed mid-session, the session was
-  resumed, taking the snapshot failed, or the directory is not a git work tree. Where git fails at stop inside a work
-  tree, the check blocks.
+- No snapshot means no check. The session ends normally when the plugin was installed mid-session, taking the snapshot
+  failed, or the directory is not a git work tree. The snapshot is the first one recorded for the session id, so a
+  resumed or compacted session with none gets one at that moment, and the check covers changes from then on. Where git
+  fails at stop inside a work tree, the check blocks.
 - Known limit: edits a human makes in their editor during the session count as session changes.
 - Known limit: only the project directory's own working tree is covered, not sibling worktrees.
 - Claude Code caps forced continuations at 8 in a row, and nothing here tries to get around that.

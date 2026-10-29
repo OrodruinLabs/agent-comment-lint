@@ -298,14 +298,13 @@ def _session_directory(root, event):
 def _record_session(root, load_config, event):
     """Record the working tree for the session; any failure means there is no snapshot, and nothing is printed."""
     try:
-        if _work_tree(root, "hook") is None:
+        located = _session_directory(root, event)
+        if located is None or _work_tree(root, "hook") is None:
             return
         config = load_config(root)
-        tree = gitio.snapshot_tree(root, _covered_paths(root, config))
-        located = _session_directory(root, event)
-        if located is not None:
-            session.record(located[0], located[1], tree)
-    except (gitio.GitError, OSError, settings.ConfigError):
+        session.record(located[0], located[1], gitio.snapshot_tree(root, _covered_paths(root, config)))
+    except Exception:
+        # A session start never fails because of the snapshot; the Stop check then lets the session end.
         return
 
 
