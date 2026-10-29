@@ -1,8 +1,8 @@
 # agent-comment-lint
 
-A zero-dependency gate that stops AI coding agents from bloating code comments, shipped four ways from this one repository: a command (`pyproject.toml`), a
-pre-commit hook (`.pre-commit-hooks.yaml`), a GitHub Action (`action.yml`) and a Claude Code plugin
-(`.claude-plugin/`, `hooks/`).
+A zero-dependency gate that stops AI coding agents from bloating code comments, shipped five ways from this one repository: a command (`pyproject.toml`), a
+pre-commit hook (`.pre-commit-hooks.yaml`), a GitHub Action (`action.yml`), a Claude Code plugin
+(`.claude-plugin/`, `hooks/`), and hook templates and guard scripts for other coding agents (`integrations/`).
 
 `docs/reference.md` is the contract: the rules, the modes, the exit codes, the settings file, and what the lexers
 know. `README.md` summarises it. Read the reference before you change behaviour. When behaviour changes, update both

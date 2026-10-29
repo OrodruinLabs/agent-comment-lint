@@ -1,10 +1,10 @@
-"""Claude Code's PreToolUse event: the file a write would leave behind, and which of its lines the write touched."""
+"""A coding agent's write event: the file a write would leave behind, and which of its lines the write touched."""
 import difflib
 import os
 from collections import namedtuple
 
 from . import codex_patch
-from .codex_patch import CodexFile, CodexHunk, apply_hunks as apply_codex_hunks
+from .codex_patch import apply_hunks as apply_codex_hunks
 
 WRITE_TOOLS = ("Write", "Edit", "MultiEdit")
 
@@ -15,7 +15,7 @@ Target.__doc__ = ("A write the hook judges: the tool's name, the file it writes,
 
 
 class HookInputError(Exception):
-    """Standard input is not the event Claude Code sends, so the hook cannot tell what is being written."""
+    """Standard input is not the event the agent sends, so the hook cannot tell what is being written."""
 
 
 def target(event):
@@ -47,8 +47,8 @@ def parse_codex_patch(text):
         raise HookInputError("apply_patch: %s" % error)
 
 
-def _codex_path(cwd, path):
-    """A patch's path as Codex resolves it: a relative one from the session's directory, when the event names one."""
+def _from_event_cwd(cwd, path):
+    """A path as the agent resolves it: a relative one from the event's `cwd`, when the event names one."""
     return os.path.join(cwd, path) if isinstance(cwd, str) and cwd else path
 
 
@@ -68,7 +68,7 @@ def _codex(event):
     found = []
     named, moved_to = set(), set()
     for change in parse_codex_patch(command):
-        path = _codex_path(cwd, change.path)
+        path = _from_event_cwd(cwd, change.path)
         key = os.path.normpath(path)
         # Codex refuses a second operation on a path, yet updates a file an earlier move wrote, which disk cannot show.
         if key in named or (change.kind == "update" and key in moved_to):
@@ -79,7 +79,7 @@ def _codex(event):
         elif change.kind == "update" and change.move_to is None:
             found.append(Target("CodexPatch", path, {"file_path": path, "hunks": change.hunks}, True))
         elif change.kind == "update":
-            destination = _codex_path(cwd, change.move_to)
+            destination = _from_event_cwd(cwd, change.move_to)
             moved_to.add(os.path.normpath(destination))
             found.append(Target("CodexPatch", destination, {"file_path": path, "hunks": change.hunks}, True, path))
     return found
@@ -116,7 +116,7 @@ def _gemini(event):
     path = info.get("file_path") if isinstance(info, dict) else None
     if not isinstance(path, str) or not path:
         raise HookInputError("%s with no \"tool_input.file_path\"" % tool)
-    path = _codex_path(event.get("cwd"), path)
+    path = _from_event_cwd(event.get("cwd"), path)
     if tool == "write_file":
         return [Target("Write", path, {"file_path": path, "content": info.get("content")})]
     replace_all = info.get("allow_multiple", False)

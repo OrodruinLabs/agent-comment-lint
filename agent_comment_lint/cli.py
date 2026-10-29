@@ -50,9 +50,10 @@ def _parser():
     mode.add_argument("--stdin-path", metavar="PATH",
                       help="judge the text on standard input as if it were the file PATH")
     mode.add_argument("--hook", action="store_true",
-                      help="read a Claude Code hook event on standard input: judge a PreToolUse write, record a "
-                           "snapshot at SessionStart, check what changed at Stop; exit 2 blocks")
-    parser.add_argument("--agent", metavar="NAME", choices=sorted(hook.ADAPTERS),
+                      help="read a coding agent's hook event on standard input and judge the write it proposes, as "
+                           "Claude Code's PreToolUse; for Claude Code, also record a snapshot at SessionStart and "
+                           "check what changed at Stop; exit 2 blocks")
+    parser.add_argument("--agent", choices=sorted(hook.ADAPTERS),
                         help="with --hook, the coding agent whose event is on standard input (default: claude)")
     parser.add_argument("--json", action="store_true", help="print one JSON document instead of text")
     parser.add_argument("--root", metavar="DIR",

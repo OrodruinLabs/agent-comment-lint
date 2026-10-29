@@ -177,7 +177,8 @@ Without an install, `python3 check-agent-comment-lint.py` from a checkout takes 
 | `--hook` | A Claude Code hook event read from standard input. A `SessionStart` event records a snapshot of the working tree and a `Stop` event judges what changed since: see [The end-of-session check](#the-end-of-session-check). Any other event is read as a PreToolUse event, whose proposed write (`Write`, `Edit`, `MultiEdit`) is judged. The whole file the write would leave is judged, and a finding counts only where its lines overlap a line the write adds or changes, as `--diff` does. Exit code 0 lets the write through and prints nothing. Any finding, a file that cannot be scanned, a file on disk that is not UTF-8, or input that is not the event is exit code 2, which blocks the write, with the report on standard error. Without `--root`, a path in another worktree of the same repository is judged from that worktree's top, with its settings file. Other tools, uncovered or excluded paths, other paths outside the root, and an edit the tool itself would refuse are let through. `--json` is a usage error with it. |
 
 Options: `--json` prints one JSON document instead of text. `--root DIR` sets the repository root (default: the git
-top level of the working directory). `--config FILE` names the settings file.
+top level of the working directory). `--config FILE` names the settings file. `--agent NAME`, with `--hook` only,
+names the agent whose event is read: see [Other coding agents](#other-coding-agents).
 
 What each mode does when git cannot answer (no git program, a `GIT_DIR` that names no repository, a stale `.git`
 file, a repository git refuses to read):

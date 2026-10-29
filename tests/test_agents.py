@@ -64,7 +64,7 @@ def patch(*lines):
 
 
 def hunk(old, new, anchor=None, at_end=False, context=()):
-    return hook.CodexHunk(anchor, old, new, at_end, context)
+    return codex_patch.CodexHunk(anchor, old, new, at_end, context)
 
 
 class TestCodexAdapter(AdapterContract, unittest.TestCase):
@@ -165,20 +165,21 @@ class TestCodexPatchParser(unittest.TestCase):
 
     def test_an_added_file_holds_its_plus_lines(self):
         self.assertEqual(self.parse("*** Add File: a.py", "+one", "+", "+two"),
-                         [hook.CodexFile("add", "a.py", None, "one\n\ntwo\n", None)])
+                         [codex_patch.CodexFile("add", "a.py", None, "one\n\ntwo\n", None)])
 
     def test_an_updated_file_holds_its_hunks(self):
         self.assertEqual(self.parse("*** Update File: a.py", "@@ def f():", " keep", "-old", "+new", "@@", "-x", "+y"),
-                         [hook.CodexFile("update", "a.py", None, None, [
+                         [codex_patch.CodexFile("update", "a.py", None, None, [
                              hunk(["keep", "old"], ["keep", "new"], anchor="def f():", context=((0, 0),)),
                              hunk(["x"], ["y"])])])
 
     def test_a_deleted_file_has_no_body(self):
-        self.assertEqual(self.parse("*** Delete File: a.py"), [hook.CodexFile("delete", "a.py", None, None, None)])
+        self.assertEqual(self.parse("*** Delete File: a.py"),
+                         [codex_patch.CodexFile("delete", "a.py", None, None, None)])
 
     def test_a_moved_file_names_its_destination(self):
         self.assertEqual(self.parse("*** Update File: a.py", "*** Move to: b/c.py", "@@", "-x", "+y"),
-                         [hook.CodexFile("update", "a.py", "b/c.py", None, [hunk(["x"], ["y"])])])
+                         [codex_patch.CodexFile("update", "a.py", "b/c.py", None, [hunk(["x"], ["y"])])])
 
     def test_a_bare_heredoc_around_the_patch_is_dropped(self):
         for opener in ("<<EOF", "<<'EOF'", '<<"EOF"'):
@@ -206,7 +207,7 @@ class TestCodexPatchParser(unittest.TestCase):
 
     def test_markers_may_carry_surrounding_whitespace(self):
         text = "\n  *** Begin Patch  \n  *** Add File: a.py  \n+a\n  *** End Patch  \n\n"
-        self.assertEqual(hook.parse_codex_patch(text), [hook.CodexFile("add", "a.py", None, "a\n", None)])
+        self.assertEqual(hook.parse_codex_patch(text), [codex_patch.CodexFile("add", "a.py", None, "a\n", None)])
 
     def test_a_first_chunk_may_omit_its_marker(self):
         self.assertEqual(self.parse("*** Update File: a.py", " keep", "-x", "+y"),
@@ -215,12 +216,12 @@ class TestCodexPatchParser(unittest.TestCase):
     def test_an_empty_line_in_an_update_is_empty_context(self):
         found = hunk(["x", ""], ["", "y"], context=((1, 0),))
         self.assertEqual(self.parse("*** Update File: a.py", "@@", "-x", "", "+y"),
-                         [hook.CodexFile("update", "a.py", None, None, [found])])
+                         [codex_patch.CodexFile("update", "a.py", None, None, [found])])
 
     def test_end_of_file_marks_the_hunk_before_it(self):
         self.assertEqual(self.parse("*** Update File: a.py", "@@", "-x", "+y", "*** End of File", "", "@@", "+z"),
-                         [hook.CodexFile("update", "a.py", None, None, [hunk(["x"], ["y"], at_end=True),
-                                                                         hunk([], ["z"])])])
+                         [codex_patch.CodexFile("update", "a.py", None, None, [hunk(["x"], ["y"], at_end=True),
+                                                                               hunk([], ["z"])])])
 
     def test_an_empty_patch_has_no_files(self):
         self.assertEqual(self.parse(), [])
