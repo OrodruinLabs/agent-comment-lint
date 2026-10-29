@@ -44,44 +44,43 @@ The numbers skip because C2, C4 and C6 need a compiler or human judgment, and th
 <div align="center">
 <table>
   <tr>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/csharp/csharp-original.svg" width="44" height="44" alt=""><br><b>C#</b><br><sub><code>.cs</code></sub></td>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/javascript/javascript-original.svg" width="44" height="44" alt=""><br><b>JavaScript</b><br><sub><code>.js</code> <code>.jsx</code> <code>.mjs</code> <code>.cjs</code></sub></td>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/typescript/typescript-original.svg" width="44" height="44" alt=""><br><b>TypeScript</b><br><sub><code>.ts</code> <code>.tsx</code> <code>.mts</code> <code>.cts</code></sub></td>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/css3/css3-original.svg" width="44" height="44" alt=""><br><b>CSS</b><br><sub><code>.css</code></sub></td>
+    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/csharp/csharp-original.svg" width="32" height="32" alt=""><br><sub>C#</sub></td>
+    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/javascript/javascript-original.svg" width="32" height="32" alt=""><br><sub>JavaScript</sub></td>
+    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/typescript/typescript-original.svg" width="32" height="32" alt=""><br><sub>TypeScript</sub></td>
+    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/css3/css3-original.svg" width="32" height="32" alt=""><br><sub>CSS</sub></td>
+    <td align="center" width="16%"><img src="https://cdn.simpleicons.org/gnubash/4EAA25" width="32" height="32" alt=""><br><sub>Shell</sub></td>
+    <td align="center" width="16%"><img src="https://cdn.simpleicons.org/yaml/CB171E" width="32" height="32" alt=""><br><sub>YAML</sub></td>
   </tr>
   <tr>
-    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/gnubash/4EAA25" width="44" height="44" alt=""><br><b>Shell</b><br><sub><code>.sh</code></sub></td>
-    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/yaml/CB171E" width="44" height="44" alt=""><br><b>YAML</b><br><sub><code>.yml</code> <code>.yaml</code></sub></td>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/terraform/terraform-original.svg" width="44" height="44" alt=""><br><b>Terraform and HCL</b><br><sub><code>.tf</code> <code>.tfvars</code> <code>.hcl</code></sub></td>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/python/python-original.svg" width="44" height="44" alt=""><br><b>Python</b><br><sub><code>.py</code></sub></td>
-  </tr>
-  <tr>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/ruby/ruby-original.svg" width="44" height="44" alt=""><br><b>Ruby</b><br><sub><code>.rb</code> <code>.rake</code> <code>.gemspec</code> <code>Gemfile</code> <code>Rakefile</code></sub></td>
-    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/toml/9C4121" width="44" height="44" alt=""><br><b>TOML</b><br><sub><code>.toml</code></sub></td>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/docker/docker-original.svg" width="44" height="44" alt=""><br><b>Dockerfile</b><br><sub><code>Dockerfile</code> <code>Containerfile</code> <code>.dockerfile</code></sub></td>
-    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/gnu/A42E2B" width="44" height="44" alt=""><br><b>Makefile</b><br><sub><code>Makefile</code> <code>makefile</code> <code>GNUmakefile</code> <code>.mk</code></sub></td>
+    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/terraform/terraform-original.svg" width="32" height="32" alt=""><br><sub>Terraform / HCL</sub></td>
+    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/python/python-original.svg" width="32" height="32" alt=""><br><sub>Python</sub></td>
+    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/ruby/ruby-original.svg" width="32" height="32" alt=""><br><sub>Ruby</sub></td>
+    <td align="center" width="16%"><img src="https://cdn.simpleicons.org/toml/9C4121" width="32" height="32" alt=""><br><sub>TOML</sub></td>
+    <td align="center" width="16%"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/docker/docker-original.svg" width="32" height="32" alt=""><br><sub>Dockerfile</sub></td>
+    <td align="center" width="16%"><img src="https://cdn.simpleicons.org/gnu/A42E2B" width="32" height="32" alt=""><br><sub>Makefile</sub></td>
   </tr>
 </table>
 </div>
 
 JSX and TSX are included. Other files are skipped, and so are dependency and build folders such as
-`node_modules`, `dist` and `.venv`. Each language's comment styles are listed in [the reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#scope).
+`node_modules`, `dist` and `.venv`. The extensions and file names each language covers are in
+[the reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#scope).
 
 ## Supported agents
 
 <div align="center">
 <table>
   <tr>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/claude-color.svg" width="44" height="44" alt=""><br><b>Claude Code</b><br><sub>Supported</sub></td>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/codex-color.svg" width="44" height="44" alt=""><br><b>Codex CLI</b><br><sub>Preview</sub></td>
-    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/windsurf/0B100F/FFFFFF" width="44" height="44" alt=""><br><b>Windsurf / Devin</b><br><sub>Preview</sub></td>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/gemini-color.svg" width="44" height="44" alt=""><br><b>Gemini CLI</b><br><sub>Preview</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/claude-color.svg" width="32" height="32" alt=""><br><sub><b>Claude Code</b><br>Supported</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/codex-color.svg" width="32" height="32" alt=""><br><sub><b>Codex CLI</b><br>Preview</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/windsurf/0B100F/FFFFFF" width="32" height="32" alt=""><br><sub><b>Windsurf / Devin</b><br>Preview</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/gemini-color.svg" width="32" height="32" alt=""><br><sub><b>Gemini CLI</b><br>Preview</sub></td>
   </tr>
   <tr>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/copilot-color.svg" width="44" height="44" alt=""><br><b>GitHub Copilot</b><br><sub>Planned</sub></td>
-    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/cursor/000000/FFFFFF" width="44" height="44" alt=""><br><b>Cursor</b><br><sub>Planned</sub></td>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/kiro-color.svg" width="44" height="44" alt=""><br><b>Kiro</b><br><sub>Planned</sub></td>
-    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/antigravity-color.svg" width="44" height="44" alt=""><br><b>Antigravity</b><br><sub>Planned</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/copilot-color.svg" width="32" height="32" alt=""><br><sub><b>GitHub Copilot</b><br>Planned</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.simpleicons.org/cursor/000000/FFFFFF" width="32" height="32" alt=""><br><sub><b>Cursor</b><br>Planned</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/kiro-color.svg" width="32" height="32" alt=""><br><sub><b>Kiro</b><br>Planned</sub></td>
+    <td align="center" width="25%"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/antigravity-color.svg" width="32" height="32" alt=""><br><sub><b>Antigravity</b><br>Planned</sub></td>
   </tr>
 </table>
 </div>
