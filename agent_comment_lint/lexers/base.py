@@ -14,8 +14,8 @@ BlockLine.__doc__ = "A line of a block the lexer placed itself: its prose, and w
 Markers = namedtuple("Markers", ["hash", "slash", "block", "star"])
 Markers.__doc__ = "Which markers start a whole-line comment: `#`, `//`, `/*`, and whether a leading `*` continues one."
 
-Family = namedtuple("Family", ["name", "extensions", "markers", "lex"])
-Family.__doc__ = "A language family: its file extensions, comment markers and `lex(text) -> [Line]`."
+Family = namedtuple("Family", ["name", "extensions", "markers", "lex", "names"], defaults=[()])
+Family.__doc__ = "A language family: its extensions, exact file names, comment markers and `lex(text) -> [Line]`."
 
 
 class LexError(Exception):

@@ -9,7 +9,7 @@ import sys
 import tempfile
 import unittest
 
-from agent_comment_lint import __version__, governance
+from agent_comment_lint import __version__, governance, lexers
 from test_agents import fixture
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -267,6 +267,18 @@ class TestPreCommitHooks(unittest.TestCase):
         patterns = re.findall(r"^  files: .*$", text, re.MULTILINE)
         self.assertEqual(len(patterns), 2)
         self.assertEqual(patterns[0], patterns[1])
+
+    def test_the_pre_commit_filter_matches_exactly_the_covered_files(self):
+        with open(os.path.join(REPO, ".pre-commit-hooks.yaml"), encoding="utf-8") as handle:
+            filters = re.findall(r"^\s*files: (.+)$", handle.read(), flags=re.M)
+        self.assertEqual(len(set(filters)), 1)
+        covered = re.compile(filters[0])
+        for extension in lexers.EXTENSIONS:
+            self.assertTrue(covered.search("dir/x" + extension), extension)
+        for name in lexers.NAMES:
+            self.assertTrue(covered.search("dir/" + name), name)
+        for other in ("dir/x.md", "dir/x.json", "dir/Makefile.bak"):
+            self.assertFalse(covered.search(other), other)
 
 
 class TestSchema(unittest.TestCase):

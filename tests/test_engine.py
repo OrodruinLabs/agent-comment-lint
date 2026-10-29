@@ -1,7 +1,8 @@
 """Judging one file: scope by extension, findings in a fixed order, and filtering to changed ranges."""
 import unittest
+from unittest import mock
 
-from agent_comment_lint import engine
+from agent_comment_lint import engine, lexers
 from agent_comment_lint.rules import Finding
 from support import LONG
 
@@ -23,6 +24,27 @@ class TestCheckText(unittest.TestCase):
 
     def test_unresolved_lines_are_counted(self):
         self.assertEqual(engine.check_text("a.cs", 'var s = @"opens\nand closes";\n').unresolved_lines, 2)
+
+
+class TestFamilyForNames(unittest.TestCase):
+    NAMED = lexers.Family("named", (".nm",), lexers.Markers(True, False, False, False), None,
+                          ("Dockerfile", "Makefile"))
+
+    def setUp(self):
+        patcher = mock.patch.object(lexers, "FAMILIES", lexers.FAMILIES + (self.NAMED,))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_a_file_is_matched_by_its_exact_name(self):
+        self.assertIs(lexers.family_for("ops/Dockerfile"), self.NAMED)
+        self.assertIs(lexers.family_for("Makefile"), self.NAMED)
+
+    def test_a_name_behind_a_backslash_is_matched_too(self):
+        self.assertIs(lexers.family_for("ops\\Dockerfile"), self.NAMED)
+
+    def test_a_name_that_only_contains_a_covered_name_is_not_matched(self):
+        for path in ("Makefile.bak", "MyDockerfile", "Dockerfile.orig", "ops/dockerfile"):
+            self.assertIsNone(lexers.family_for(path), path)
 
 
 class TestWithin(unittest.TestCase):

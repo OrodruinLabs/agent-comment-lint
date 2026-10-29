@@ -8,10 +8,10 @@ from . import __version__
 from . import config as settings
 from . import engine, gitio, hook, report, session
 from .diff import parse_diff_ranges
-from .lexers import EXTENSIONS, LexError, family_for
+from .lexers import EXTENSIONS, NAMES, LexError, family_for
 
 DESCRIPTION = "Check code comments against fixed rules. Exit 0 clean, 1 violations, 2 could not scan."
-SCOPE_NOTE = "Covered file types: %s" % " ".join(EXTENSIONS)
+SCOPE_NOTE = "Covered file types: %s" % " ".join(EXTENSIONS + NAMES)
 
 # A byte-order mark is not part of the text: left in, it hides the first line's comment marker.
 ENCODING = "utf-8-sig"
