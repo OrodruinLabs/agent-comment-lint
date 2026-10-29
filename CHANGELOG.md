@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.2.0
+
+- Platforms: runs on macOS, Linux and native Windows, with CI on all three. The hook wrapper looks for Python as
+  `AGENT_COMMENT_LINT_PYTHON`, then `python3`, `python` and `py -3`, and takes the first that is 3.9 or newer.
+  Roots are compared without regard to case where the file system ignores it. Moves nothing in the findings.
+- Hook, changed lines: in hook mode a write is judged only on the lines it adds or changes, and this is fast on
+  large, repetitive files. Moves findings in hook mode only, and rarely: a comment elsewhere in the file no longer
+  blocks a write, and a comment the write touches is judged as before. `--diff`, `--all` and `--files` are unchanged.
+- Hook, teaching message: a blocked write quotes the offending comment, with the lines numbered as the engine
+  numbers them, and gives one Fix line per rule. It says that splitting a comment across blank lines, writing the
+  file another way, or excluding the path is not a fix, and a blocked Write is told to re-send only the comment
+  lines. Moves no finding.
+- C3: the opt-in `agent-context` pack flags `Task 8`, `step 3 of the plan`, `per the spec`, `per the review`,
+  `as requested`, `as discussed`, `as agreed`, `the user asked`, `the user requested` and an upper-case notes file
+  such as `PLAN.md`. Off unless a settings file names it, so no existing finding moves.
+- GitHub Action: findings appear as inline annotations on the changed lines, and the job summary lists all of them.
+  GitHub shows at most 10 annotations per step. Moves no finding.
+- Settings: the settings file accepts `$schema`, and the repository publishes
+  `schema/agent-comment-lint.schema.json` for editor completion. Moves no finding.
+- PyPI: releases publish to PyPI through trusted publishing, so `uv tool install agent-comment-lint==1.2.0` and
+  `pipx install agent-comment-lint==1.2.0` work.
+
 ## 1.1.0
 
 - C1 no longer counts a comment line that holds no letter or digit in any script, such as a ruler like `// ----`,

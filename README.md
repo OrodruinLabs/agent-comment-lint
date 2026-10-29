@@ -16,6 +16,8 @@ AI coding agents comment the way they chat: three lines restating what the next 
 ticket or plan they were working from. The restatement drifts from the code, and the pointer rots when the document
 moves.
 
+**Your CLAUDE.md asks; this enforces.**
+
 agent-comment-lint holds every comment to one line, with no ticket or plan references. In Claude Code it blocks the
 write before the comment lands and shows the agent why, so the agent can rewrite it. The same check runs in CI, in
 pre-commit and from the command line.
@@ -61,7 +63,7 @@ JSX and TSX are included. Other files are skipped, and so are dependency and bui
 
 ## Setup
 
-Pick where it runs; every channel runs the same check. The snippets pin `v1.1.0`. Keep a pin, so a new release never
+Pick where it runs; every channel runs the same check. The snippets pin `v1.2.0`. Keep a pin, so a new release never
 changes your results without a commit of yours.
 
 ### Claude Code
@@ -86,7 +88,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: OrodruinLabs/agent-comment-lint@v1.1.0
+      - uses: OrodruinLabs/agent-comment-lint@v1.2.0
 ```
 
 Only the lines the pull request changes are checked. Keep `fetch-depth: 0`, or the step cannot see what changed and
@@ -98,7 +100,7 @@ lists them all. The inputs are in [the reference](docs/reference.md#github-actio
 ```yaml
 repos:
   - repo: https://github.com/OrodruinLabs/agent-comment-lint
-    rev: v1.1.0
+    rev: v1.2.0
     hooks:
       - id: agent-comment-lint
 ```
@@ -115,8 +117,8 @@ pipx install agent-comment-lint==1.2.0
 To install from the repository instead:
 
 ```
-uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.1.0
-pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.1.0
+uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.2.0
+pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.2.0
 ```
 
 `uvx agent-comment-lint` runs it without installing, which suits CI and trials.

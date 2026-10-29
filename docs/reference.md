@@ -275,6 +275,9 @@ governance list are the policy. There is no inline suppression.
 - A `<<` inside shell arithmetic `(( ))` is a shift, not a heredoc. `<<<` is a herestring.
 - Python text that parses is never refused. A triple quote that never closes is refused only when the text does not
   parse.
+- A comment block can be split by blank lines into separate one-line blocks, and each passes C1. Joining such runs
+  flagged many legitimately separate comments, so it is not done. The write-time hook's message tells the agent that
+  splitting is not a fix.
 
 ## Known false positives
 
