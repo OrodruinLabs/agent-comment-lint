@@ -62,6 +62,10 @@ class LineBuilder:
             self.newline(kind)
             self.emit(kind, part)
 
+    def place(self, block):
+        """Place one BlockLine on the current line, for a block the lexer finds by its own rules."""
+        self._blocks.append(block)
+
     def emit_block_comment(self, text):
         """Append one whole `/* */` comment; when it crosses line breaks, each of its lines is placed in one block."""
         parts = text.split("\n")

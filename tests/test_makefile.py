@@ -4,7 +4,7 @@ import re
 import unittest
 
 from agent_comment_lint.lexers import LexError, family_for
-from support import comments, found
+from support import LONG, comments, found
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -75,6 +75,21 @@ class TestOutsideRecipes(unittest.TestCase):
         lines = family_for("Makefile").lex("# one \\\ntwo\nall:\n")
         self.assertEqual([line.opens_in for line in lines], ["code", "comment", "code"])
 
+    def test_a_continued_comment_is_one_block(self):
+        self.assertEqual(found("Makefile", "# first prose line \\\n  second prose line\n"), [("C1", 1)])
+
+    def test_a_continued_trailing_comment_is_one_block(self):
+        self.assertEqual(found("Makefile", "x = 1 # first prose \\\n  second prose\nall:\n"), [("C1", 1)])
+
+    def test_a_long_continuation_of_a_comment_is_reported(self):
+        self.assertEqual(found("Makefile", "# one \\\n" + LONG + "\n"), [("C1", 1), ("C7", 2)])
+
+    def test_a_continued_line_inside_a_reference_is_not_a_comment_line(self):
+        self.assertEqual(found("Makefile", "X = $(shell echo \\\n# one prose \\\n# two prose)\n"), [])
+
+    def test_a_shebang_is_not_prose(self):
+        self.assertEqual(found("Makefile", "#!/usr/bin/make -f\n# one line\nall:\n"), [])
+
 
 class TestRecipes(unittest.TestCase):
     def test_a_hash_in_a_quoted_recipe_string_is_not_a_comment(self):
@@ -93,9 +108,6 @@ class TestRecipes(unittest.TestCase):
     def test_a_doubled_dollar_is_a_literal_dollar(self):
         self.assertEqual(found("Makefile", "all:\n\techo $$#docs/x\n"), [])
 
-    def test_a_tab_line_is_a_recipe_wherever_it_stands(self):
-        self.assertEqual(found("Makefile", 'x = 1\n\techo "# ADR-9"\n'), [])
-
     def test_a_continued_recipe_line_carries_the_quote_over(self):
         self.assertEqual(found("Makefile", 'all:\n\techo "a \\\n# ADR-9"\n'), [])
 
@@ -109,6 +121,88 @@ class TestRecipes(unittest.TestCase):
 
     def test_a_recipe_heredoc_opens_nothing(self):
         self.assertEqual(found("Makefile", "all:\n\tcat <<EOF\n\t# ADR-9\n"), [("C3", 3)])
+
+    def test_a_continued_line_inside_a_recipe_reference_is_not_a_comment_line(self):
+        self.assertEqual(found("Makefile", "all:\n\techo $(shell echo \\\n# one prose \\\n# two prose)\n"), [])
+
+    def test_a_hash_a_continuation_carries_into_a_word_is_not_a_comment_line(self):
+        self.assertEqual(found("Makefile", "all:\n\techo a\\\n#one prose\n# two prose\n"), [])
+
+
+class TestRuleContext(unittest.TestCase):
+    def test_a_tab_line_before_any_rule_is_make_syntax(self):
+        self.assertEqual(found("Makefile", 'x = 1\n\techo "# see ADR-9"\n'), [("C3", 2)])
+
+    def test_an_assignment_closes_the_rule(self):
+        text = "all:\n\techo hi\nX = 1\n\tY := don't\n"
+        self.assertEqual(found("Makefile", text), [])
+
+    def test_a_tab_line_in_a_conditional_outside_a_rule_is_make_syntax(self):
+        self.assertEqual(found("Makefile", 'ifeq ($(OS),x)\n\tMSG := "see # docs/x"\nendif\n'), [("C3", 2)])
+
+    def test_a_recipe_after_a_conditional_inside_a_rule_is_still_a_recipe(self):
+        text = 'all:\nifeq ($(A),b)\n\techo "# ADR-9"\nelse\n\techo "# ADR-9"\nendif\n\techo "# ADR-9"\n'
+        self.assertEqual(found("Makefile", text), [])
+
+    def test_an_indented_conditional_keeps_the_rule_open(self):
+        text = 'all:\n  ifdef A\n\techo "# ADR-9"\n  endif # A\n\techo "# ADR-9"\n'
+        self.assertEqual(found("Makefile", text), [])
+
+    def test_blank_and_comment_lines_keep_the_rule_open(self):
+        self.assertEqual(found("Makefile", 'all:\n\n# note\n\techo "# ADR-9"\n'), [])
+
+    def test_a_double_colon_rule_opens_a_rule(self):
+        self.assertEqual(found("Makefile", 'all::\n\techo "# ADR-9"\n'), [])
+
+    def test_a_rule_line_with_references_opens_a_rule(self):
+        self.assertEqual(found("Makefile", '$(OBJS): %.o: %.c $(X:a=b)\n\techo "# ADR-9"\n'), [])
+
+    def test_an_assignment_operator_before_the_colon_is_not_a_rule(self):
+        for head in ("X := a", "X ::= a", "X :::= a", "X ?= a:b", "X += a:b", "X != echo a:b", "X = a:b"):
+            self.assertEqual(found("Makefile", head + '\n\techo "# see ADR-9"\n'), [("C3", 2)], head)
+
+    def test_a_colon_inside_a_reference_opens_no_rule(self):
+        self.assertEqual(found("Makefile", '$(eval $(call T,a:b))\n\techo "# see ADR-9"\n'), [("C3", 2)])
+
+    def test_a_target_specific_variable_closes_the_rule(self):
+        for head in ("all: X = 1", "all: X := 1", "%.o: CFLAGS += -O2", "all:: X = 1"):
+            self.assertEqual(found("Makefile", 'all:\n' + head + '\n\techo "# see ADR-9"\n'), [("C3", 3)], head)
+
+    def test_an_assignment_after_a_semicolon_is_part_of_the_recipe(self):
+        self.assertEqual(found("Makefile", 'all: ; X=1\n\techo "# ADR-9"\n'), [])
+
+    def test_a_directive_closes_the_rule(self):
+        for line in ("include a.mk", "-include a.mk", "sinclude a.mk", "export X", "unexport X", "override X = 1",
+                     "vpath %.c src", "export a: b", "define X\nendef"):
+            self.assertEqual(found("Makefile", 'all:\n' + line + '\n\techo "# see ADR-9"\n')[-1:],
+                             [("C3", 3 + line.count("\n"))], line)
+
+    def test_a_conditional_keyword_used_as_a_variable_closes_the_rule(self):
+        self.assertEqual(found("Makefile", 'all:\nelse = 1\n\techo "# see ADR-9"\n'), [("C3", 3)])
+
+    def test_a_rule_line_opens_a_new_rule(self):
+        self.assertEqual(found("Makefile", 'X = 1\nall: X\n\techo "# ADR-9"\n'), [])
+
+
+class TestRecipePrefixes(unittest.TestCase):
+    def test_a_comment_behind_a_prefix_is_read(self):
+        for prefix in ("@", "-", "+", "@-", "@ ", " @\t-+"):
+            self.assertEqual(found("Makefile", "all:\n\t" + prefix + "# see ADR-9\n"), [("C3", 2)], prefix)
+
+    def test_prefixed_comment_lines_are_one_block(self):
+        self.assertEqual(found("Makefile", "all:\n\t@# one\n\t@# two\n"), [("C1", 2)])
+
+    def test_a_run_of_plain_and_prefixed_comment_lines_is_one_block(self):
+        self.assertEqual(found("Makefile", "all:\n\t# one\n\t@# two\n\t-# three\n"), [("C1", 2)])
+
+    def test_a_prefixed_comment_line_after_code_starts_a_block(self):
+        self.assertEqual(found("Makefile", "all:\n\t@echo hi\n\t@# one\n\techo bye\n"), [])
+
+    def test_a_long_prefixed_comment_line_is_reported(self):
+        self.assertEqual(found("Makefile", "all:\n\t@# " + LONG + "\n"), [("C7", 2)])
+
+    def test_the_prefix_is_read_only_at_the_start_of_a_recipe_line(self):
+        self.assertEqual(found("Makefile", "all:\n\techo a \\\n@# see ADR-9\n"), [])
 
 
 class TestDefine(unittest.TestCase):
@@ -143,6 +237,16 @@ class TestDefine(unittest.TestCase):
 
     def test_define_in_a_recipe_opens_nothing(self):
         self.assertEqual(found("Makefile", "all:\n\tdefine X\n"), [])
+
+    def test_only_a_bare_define_nests(self):
+        self.assertEqual(found("Makefile", "define X\noverride define Y\nendef\nall:\n"), [])
+
+    def test_a_tab_line_in_a_define_body_is_content(self):
+        self.assertEqual(found("Makefile", "define X\n\tendef\n# see ADR-9\nendef\n"), [])
+        self.assertEqual(found("Makefile", "define X\n\tdefine y\nendef\n"), [])
+
+    def test_a_define_closes_the_rule(self):
+        self.assertEqual(found("Makefile", 'all:\ndefine X\nx\nendef\n\techo "# see ADR-9"\n'), [("C3", 5)])
 
 
 class TestAssignmentsAndLineEndings(unittest.TestCase):
