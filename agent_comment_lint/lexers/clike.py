@@ -19,11 +19,16 @@ SWIFT_RAW = re.compile(r'(#+)"')
 # The delimiter has at most 16 characters, and none of them is a parenthesis, a backslash or a space.
 CPP_RAW = re.compile(r'"([^()\\\s]{0,16})\(')
 CPP_RAW_PREFIXES = ("R", "LR", "uR", "UR", "u8R")
+CHAR_LITERALS = ("simple", "rust")
 RUST_CHAR = re.compile(r"'(?:\\(?:u\{[0-9a-fA-F_]{1,6}\}|x[0-9a-fA-F]{2}|.)|[^\\'\n])'")
 
 
 def lexer(syntax):
     """The `lex(text) -> [Line]` of the C-family language that `syntax` describes."""
+    if syntax.raw_string not in (None,) + tuple(RAW_STRINGS) or syntax.char_literal not in CHAR_LITERALS:
+        raise ValueError("raw_string must be None or one of %s, and char_literal one of %s: %r"
+                         % (", ".join(RAW_STRINGS), ", ".join(CHAR_LITERALS), syntax))
+
     def lex(text):
         return _lex(normalized(text), syntax)
     return lex
@@ -72,6 +77,9 @@ def _line_comment(out, src, i, continues, place=False):
         if index:
             out.newline(COMMENT)
         out.emit(COMMENT, part)
+        # A blank line ends the logical line, and placing it would keep the block open into the next comment.
+        if index and not part.strip():
+            break
         # Behind code the first line starts a block, as a comment after a block close does; the rest join it.
         out.place(BlockLine(_line_prose(part, not index), after_code and not index, False))
     return end

@@ -30,6 +30,9 @@ class TestLiterals(unittest.TestCase):
     def test_a_rune_holding_a_slash_is_not_a_comment(self):
         self.assertEqual(comments("a.go", "r := '/'\n"), [[]])
 
+    def test_a_rune_holding_a_backtick_opens_no_raw_string(self):
+        self.assertEqual(found("a.go", "r := '`' // see ADR-9\n"), [("C3", 1)])
+
     def test_an_unterminated_raw_string_cannot_be_lexed(self):
         with self.assertRaises(LexError) as caught:
             found("a.go", "var s = `x\n")
@@ -100,6 +103,24 @@ class TestDirectives(unittest.TestCase):
 
     def test_a_directive_inside_a_block_comment_is_block_text(self):
         self.assertEqual(found("a.go", "/*\none\n//go:build x\n*/\n"), [("C1", 2)])
+
+
+class TestDirectiveReasons(unittest.TestCase):
+    def test_a_reason_after_a_directive_is_read_for_references(self):
+        self.assertEqual(found("a.go", "//nolint:gosec // see ADR-12\nx := 1\n"), [("C3", 1)])
+        self.assertEqual(comments("a.go", "//nolint:gosec // see ADR-12\nx := 1\n"), [["// see ADR-12"], []])
+
+    def test_a_plain_reason_after_a_directive_passes(self):
+        self.assertEqual(found("a.go", "//nolint:gosec // fine\n"), [])
+
+    def test_a_long_reason_after_a_directive_is_an_overlong_comment_line(self):
+        self.assertEqual(found("a.go", "//nolint:gosec // %s\n" % LONG), [("C7", 1)])
+
+    def test_a_reason_is_a_trailing_comment_that_joins_no_block(self):
+        self.assertEqual(found("a.go", "// one\n//nolint:gosec // two\n// three\nx := 1\n"), [])
+
+    def test_a_directive_without_a_reason_is_still_not_read(self):
+        self.assertEqual(found("a.go", "//go:embed docs/*\nvar d embed.FS\n"), [])
 
 
 if __name__ == "__main__":

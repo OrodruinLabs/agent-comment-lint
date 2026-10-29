@@ -19,6 +19,16 @@ def comments(syntax, text):
     return [[part for kind, part in line.segments if kind == "comment"] for line in clike.lexer(syntax)(text)]
 
 
+class TestOptionValues(unittest.TestCase):
+    def test_an_unknown_raw_string_style_is_refused(self):
+        with self.assertRaises(ValueError):
+            clike.lexer(PLAIN._replace(raw_string="Rust"))
+
+    def test_an_unknown_character_literal_style_is_refused(self):
+        with self.assertRaises(ValueError):
+            clike.lexer(PLAIN._replace(char_literal="Rust"))
+
+
 class TestPlain(unittest.TestCase):
     def test_a_slash_pair_in_a_string_is_not_a_comment(self):
         self.assertEqual(comments(PLAIN, 's = "http://host/ADR-9";\n'), [[]])
@@ -297,6 +307,10 @@ class TestLineContinuation(unittest.TestCase):
 
     def test_a_backslash_on_the_last_line_ends_the_text(self):
         self.assertEqual(found(self.CONTINUED, "int x; // see ADR-9 \\"), [("C3", 1)])
+
+    def test_a_blank_continuation_line_ends_the_block(self):
+        self.assertEqual(found(self.CONTINUED, "// a \\\n\n// b\nint x;\n"), [])
+        self.assertEqual(found(self.CONTINUED, "// a \\\n  \n// b\nint x;\n"), [])
 
 
 class TestWindowsLineEndings(unittest.TestCase):

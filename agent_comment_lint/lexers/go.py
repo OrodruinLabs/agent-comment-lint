@@ -20,10 +20,18 @@ def _is_directive(line):
     return kind == COMMENT and not lead.strip() and DIRECTIVE.match(text) is not None
 
 
+def _directive_line(line):
+    """The directive as content that opens in a string; from its first ` //` on, a reason is a trailing comment."""
+    raw = "".join(part for _, part in line.segments)
+    space = raw.find(" //", len(raw) - len(raw.lstrip()) + 2)
+    if space < 0:
+        return Line([(CODE, raw)], STRING)
+    return Line([(CODE, raw[:space + 1]), (COMMENT, raw[space + 1:])], STRING)
+
+
 def lex(text):
-    """Lex Go; a directive line is content that opens in a string, as a Dockerfile parser directive is."""
-    return [Line([(CODE, "".join(part for _, part in line.segments))], STRING) if _is_directive(line) else line
-            for line in _lex(text)]
+    """Lex Go; a directive line opens in a string, as a Dockerfile parser directive does, so C1 never counts it."""
+    return [_directive_line(line) if _is_directive(line) else line for line in _lex(text)]
 
 
 FAMILY = Family("go", (".go",), clike.MARKERS, lex)
