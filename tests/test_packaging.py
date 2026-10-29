@@ -44,6 +44,21 @@ class TestManifests(unittest.TestCase):
         self.assertTrue(re.fullmatch(entry["matcher"], "Edit") and re.fullmatch(entry["matcher"], "Write"))
 
 
+class TestVersionPins(unittest.TestCase):
+    def test_every_version_pin_in_the_docs_and_schema_is_the_package_version(self):
+        pin = re.compile(r"(?:v|==)(\d+\.\d+\.\d+)")
+        found = 0
+        for parts in (("README.md",), ("docs", "reference.md"), ("schema", "agent-comment-lint.schema.json")):
+            with open(os.path.join(REPO, *parts), encoding="utf-8") as handle:
+                lines = [line for line in handle.read().splitlines() if "devicon@" not in line]
+                for version in pin.findall("\n".join(lines)):
+                    found += 1
+                    self.assertEqual(version, __version__, "/".join(parts))
+        self.assertGreater(found, 0)
+        schema_id = load("schema", "agent-comment-lint.schema.json")["$id"]
+        self.assertIn("v" + __version__, schema_id)
+
+
 def fake_bin(tmp, **scripts):
     """A directory holding one executable `#!/bin/sh` script per keyword, named after it."""
     for name, body in scripts.items():
