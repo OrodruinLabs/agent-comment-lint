@@ -122,3 +122,17 @@ class TestChangedRanges(unittest.TestCase):
         rows = ["k"] + PERIODIC * 700 + ["k"]
         after = ["z"] + PERIODIC * 700 + ["z"]
         self.assertEqual(hook.changed_ranges(lines(rows), lines(after)), [(1, 1), (2102, 2102)])
+
+    def test_an_insert_into_an_identical_block_is_one_line(self):
+        self.assertEqual(hook.changed_ranges("a\n", "a\na\n"), [(2, 2)])
+        self.assertEqual(hook.changed_ranges("a\na\n", "a\na\na\n"), [(3, 3)])
+
+    def test_an_append_to_an_identical_block_is_the_new_line(self):
+        self.assertEqual(hook.changed_ranges("a\na\nb\n", "a\na\nb\nb\n"), [(4, 4)])
+
+    def test_a_delete_from_an_identical_block_touches_no_line(self):
+        self.assertEqual(hook.changed_ranges("a\na\na\n", "a\na\n"), [])
+
+    def test_a_missing_final_newline_does_not_change_the_range(self):
+        self.assertEqual(hook.changed_ranges("a\nb", "a\nb\nb"), [(3, 3)])
+        self.assertEqual(hook.changed_ranges("a", "a\na"), [(2, 2)])
