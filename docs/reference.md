@@ -62,10 +62,13 @@ Enable either the plugin or the command, not both, or every write is judged twic
 
 Without `fetch-depth: 0` on the checkout the merge base is missing, and the step exits 2.
 
-To post the findings as review comments instead, pipe the command through reviewdog:
+To post the findings as review comments instead, pipe the command through reviewdog. The step names `shell: bash`,
+which runs with `-o pipefail`, so a "could not scan" exit 2 is not hidden by reviewdog's own status. The checkout needs
+`fetch-depth: 0` for `--diff`.
 
 ```yaml
-- run: agent-comment-lint --diff origin/${{ github.base_ref }} | reviewdog -efm="%f:%l: %m" -reporter=github-pr-review -filter-mode=added
+- shell: bash
+  run: agent-comment-lint --diff origin/${{ github.base_ref }} | reviewdog -efm="%f:%l: %m" -reporter=github-pr-review -filter-mode=added
 ```
 
 ### pre-commit
@@ -320,7 +323,9 @@ finding counts only where it overlaps a line the write adds or changes.
   `old_string`. The hook matches exactly, plus line endings, so such an edit is let through as one the tool would
   refuse.
 - Known limit: the changed lines are found after trimming the lines a write leaves untouched at the start and end
-  of the file. A write that changes lines far apart across a very large, repetitive file is still slower.
+  of the file. A write that changes lines far apart across a very large, repetitive file is still quadratic: about
+  6 s at 10,000 lines, and near 30,000 lines a `replace_all` can pass the 60 s hook timeout. Exclude big generated
+  files.
 
 ## Versions
 

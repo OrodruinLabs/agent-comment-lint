@@ -5,9 +5,11 @@
 - Platforms: runs on macOS, Linux and native Windows, with CI on all three. The hook wrapper looks for Python as
   `AGENT_COMMENT_LINT_PYTHON`, then `python3`, `python` and `py -3`, and takes the first that is 3.9 or newer.
   On Windows, the root containment check compares paths without regard to case. Moves nothing in the findings.
-- Hook, changed lines: in hook mode a write is judged only on the lines it adds or changes, and this is fast on
-  large, repetitive files. Moves findings in hook mode only, and rarely: a comment elsewhere in the file no longer
-  blocks a write, and a comment the write touches is judged as before. `--diff`, `--all` and `--files` are unchanged.
+- Hook, changed lines: before the diff, the hook trims the lines both versions share, so a small edit to a large
+  file of repeated lines no longer comes back as a wide changed range, and old findings inside that wrong range no
+  longer block a clean write. A one-line edit to a 50,000-line file is judged well under a second. Moves findings
+  of every rule (C1, C3, C5, C7) in every language, in hook mode only, and rarely. `--diff`, `--all` and `--files`
+  are unchanged.
 - Hook, teaching message: a blocked write quotes the offending comment, with the lines numbered as the engine
   numbers them, and gives one Fix line per rule. It says that splitting a comment across blank lines, writing the
   file another way, or excluding the path is not a fix, and a blocked Write is told to re-send only the comment

@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/OrodruinLabs/agent-comment-lint/actions/workflows/ci.yml"><img src="https://github.com/OrodruinLabs/agent-comment-lint/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
+  <a href="https://github.com/OrodruinLabs/agent-comment-lint/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
   <img src="https://img.shields.io/badge/python-3.9%E2%80%933.13-3776AB" alt="Python 3.9 to 3.13" />
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="No dependencies" />
   <img src="https://img.shields.io/badge/Claude_Code-Plugin-7c3aed" alt="Claude Code plugin" />
@@ -59,7 +59,7 @@ The numbers skip because C2, C4 and C6 need a compiler or human judgment, and th
 </div>
 
 JSX and TSX are included. Other files are skipped, and so are dependency and build folders such as
-`node_modules`, `dist` and `.venv`. Each language's comment styles are listed in [the reference](docs/reference.md#scope).
+`node_modules`, `dist` and `.venv`. Each language's comment styles are listed in [the reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#scope).
 
 ## Setup
 
@@ -75,7 +75,7 @@ changes your results without a commit of yours.
 
 macOS, Linux and Windows are supported. The plugin finds Python as `AGENT_COMMENT_LINT_PYTHON`, `python3`, `python`,
 then `py -3`. A write that adds a bad comment is blocked, and Claude sees why. Old comments the write
-leaves alone never block it. To turn it on for a whole team, see [Claude Code setup](docs/reference.md#claude-code).
+leaves alone never block it. To turn it on for a whole team, see [Claude Code setup](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#claude-code).
 
 ### GitHub Actions
 
@@ -93,7 +93,7 @@ jobs:
 
 Only the lines the pull request changes are checked. Keep `fetch-depth: 0`, or the step cannot see what changed and
 fails. Findings appear as annotations on the changed lines. GitHub shows at most 10 per step, and the job summary
-lists them all. The inputs are in [the reference](docs/reference.md#github-actions).
+lists them all. The inputs are in [the reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#github-actions).
 
 ### pre-commit
 
@@ -173,7 +173,7 @@ turn on only the ones your team uses.
 
 ## Documentation
 
-[The reference](docs/reference.md) has everything else:
+[The reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md) has everything else:
 - every reference shape C3 refuses
 - each mode and exit code
 - team setup for Claude Code
@@ -182,4 +182,4 @@ turn on only the ones your team uses.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/LICENSE).

@@ -40,5 +40,9 @@ claude plugin validate .                                      # the plugin and m
 1. Bump `__version__` and `.claude-plugin/plugin.json` together, and add the changelog entry.
 2. A change that can move findings is at least a minor release, and its changelog entry names the rules or languages
    it moves.
-3. Merge, then tag `vX.Y.Z` on `main`. `release.yml` checks the versions, runs the suite, builds, and creates the
+3. Before the first tag that publishes to PyPI, do the one-time setup. On pypi.org create a pending trusted publisher
+   (owner `OrodruinLabs`, repository `agent-comment-lint`, workflow `release.yml`, environment `pypi`). In the GitHub
+   repository settings create the `pypi` environment, ideally with a required reviewer. If an upload fails, re-run the
+   failed `pypi` job; the GitHub release and tag stay.
+4. Merge, then tag `vX.Y.Z` on `main`. `release.yml` checks the versions, runs the suite, builds, and creates the
    GitHub release.

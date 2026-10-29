@@ -121,6 +121,7 @@ class TestAgentContextPack(unittest.TestCase):
         self.assertEqual(first_reference("(Task #1775)"), "Task #1775")
 
     def test_ordinary_text_and_well_known_files_are_not_flagged(self):
+        # A moved-to note is out-of-scope edit narration, which the spec leaves to the model, not to C3.
         for comment in ("(moved to ./phaseStepper.ts)", "see README.md", "per CHANGELOG.md", "task 8 ran twice",
                         "A.md is one letter", "Taskbar 8"):
             self.assertIsNone(self.pack.first_reference(comment), comment)
