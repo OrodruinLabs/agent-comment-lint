@@ -15,6 +15,9 @@ PINNED_SETTINGS = ("core.quotePath=false", "diff.context=0")
 # Git lets this variable beat `-U0` and `diff.context` alike when it prints a patch; the count never reads it.
 UNPINNABLE_ENVIRONMENT = ("GIT_DIFF_OPTS",)
 
+# With a split index, every write of the temporary index would leave a shared index in the git directory.
+SCRATCH_INDEX_SETTINGS = ("core.splitIndex=false",)
+
 # One shape for every diff, whatever the user's or the build agent's git configuration says.
 DIFF_SHAPE = ("--inter-hunk-context=0", "--no-color", "--no-ext-diff", "--no-textconv", "--src-prefix=a/",
               "--dst-prefix=b/", "--find-renames", "--relative", "--diff-filter=d")
@@ -26,9 +29,9 @@ class GitError(Exception):
     returncode = None
 
 
-def _git_bytes(root, *args, env=None, input=None):
+def _git_bytes(root, *args, env=None, input=None, settings=()):
     command = ["git"]
-    for setting in PINNED_SETTINGS:
+    for setting in PINNED_SETTINGS + settings:
         command += ["-c", setting]
     environment = {name: value for name, value in os.environ.items() if name not in UNPINNABLE_ENVIRONMENT}
     environment.update(env or {})
@@ -165,16 +168,19 @@ def snapshot_tree(root, paths):
                 os.remove(scratch)
         except OSError as error:
             raise GitError("the temporary index could not be made: %s" % (error.strerror or error))
-        env = {"GIT_INDEX_FILE": scratch}
+
+        def scratch_git(*args, input=None):
+            env = {"GIT_INDEX_FILE": scratch}
+            return _git_bytes(root, *args, env=env, input=input, settings=SCRATCH_INDEX_SETTINGS)
+
         listing = "".join(path + "\0" for path in paths).encode("utf-8")
-        _git_bytes(root, "update-index", "--add", "--remove", "-z", "--stdin", env=env, input=listing)
+        scratch_git("update-index", "--add", "--remove", "-z", "--stdin", input=listing)
         # Write-tree refuses a conflict mid-merge; a path still unmerged here is one the policy does not cover.
-        unmerged = _git_bytes(root, "ls-files", "-u", "-z", "--", ":/", env=env).split(b"\0")
+        unmerged = scratch_git("ls-files", "-u", "-z", "--", ":/").split(b"\0")
         names = dict.fromkeys(record.split(b"\t", 1)[1] for record in unmerged if record)
         if names:
-            _git_bytes(root, "update-index", "--force-remove", "-z", "--stdin", env=env,
-                       input=b"".join(name + b"\0" for name in names))
-        return _git_bytes(root, "write-tree", env=env).decode("ascii").strip()
+            scratch_git("update-index", "--force-remove", "-z", "--stdin", input=b"".join(n + b"\0" for n in names))
+        return scratch_git("write-tree").decode("ascii").strip()
     finally:
         try:
             os.remove(scratch)

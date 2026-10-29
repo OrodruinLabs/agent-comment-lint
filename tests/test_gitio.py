@@ -182,6 +182,20 @@ class TestRepository(unittest.TestCase):
         tree = gitio.snapshot_tree(sub, ["c.ts"])
         self.assertEqual(gitio.blob(sub, tree + ":./c.ts"), b"const c = 2;\n")
 
+    def shared_indexes(self):
+        return sorted(name for name in os.listdir(os.path.join(self.tmp, ".git")) if name.startswith("sharedindex."))
+
+    def test_a_snapshot_writes_no_shared_index(self):
+        self.git("config", "core.splitIndex", "true")
+        self.git("config", "splitIndex.maxPercentChange", "0")
+        self.write("a.ts", b"one\n")
+        self.commit()
+        before = self.shared_indexes()
+        self.assertTrue(before)
+        self.write("b.ts", b"new\n")
+        gitio.snapshot_tree(self.tmp, ["a.ts", "b.ts"])
+        self.assertEqual(self.shared_indexes(), before)
+
     def test_has_object_is_false_only_for_an_object_the_repository_lacks(self):
         self.write("a.ts", b"one\n")
         self.assertTrue(gitio.has_object(self.tmp, gitio.snapshot_tree(self.tmp, ["a.ts"])))
