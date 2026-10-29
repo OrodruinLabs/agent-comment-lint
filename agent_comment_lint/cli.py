@@ -167,13 +167,14 @@ class _Run:
         self.governance = settings.EMPTY.governance
 
     def judge(self, path, text, ranges=None):
-        self.texts[path] = text
         try:
             result = engine.check_text(path, text, self.governance)
         except LexError as error:
             self.errors.append((path, error.line, error.message))
             return
         found = result.findings if ranges is None else engine.within(result.findings, ranges)
+        if found:
+            self.texts[path] = text
         self.scanned += 1
         self.unresolved += result.unresolved_lines
         self.findings.extend((path, finding) for finding in found)

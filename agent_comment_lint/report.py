@@ -73,11 +73,11 @@ def as_text(report):
     return "".join(line + "\n" for line in out + summary), "".join(line + "\n" for line in err)
 
 
-def _excerpt(text, finding):
-    """The finding's source lines, indented, cut to the excerpt limits; empty when the text is not known."""
-    if text is None:
+def _excerpt(source, finding):
+    """The finding's source lines, indented, cut to the excerpt limits; empty when the lines are not known."""
+    if source is None:
         return []
-    lines = text.splitlines()[finding.line - 1:finding.end_line]
+    lines = source[finding.line - 1:finding.end_line]
     shown = ["    " + (line if len(line) <= EXCERPT_WIDTH else line[:EXCERPT_WIDTH - 1] + "\u2026")
              for line in lines[:EXCERPT_LINES]]
     if len(lines) > EXCERPT_LINES:
@@ -86,11 +86,14 @@ def _excerpt(text, finding):
 
 
 def hook_text(report, texts, header, closing):
-    """The whole standard error of a blocked hook: each finding quoted with its fix, then the summary and `closing`."""
+    """Hook stderr: `header` ends in a newline; `closing` lines have none and appear only with findings."""
     lines = []
+    split = {}
     for path, finding in _sorted_findings(report):
+        if path not in split:
+            split[path] = texts[path].splitlines() if path in texts else None
         lines.append(_finding_line(path, finding))
-        lines.extend(_excerpt(texts.get(path), finding))
+        lines.extend(_excerpt(split[path], finding))
         if finding.rule in FIXES:
             lines.append("  Fix: " + FIXES[finding.rule])
     out, err = _summary(report)

@@ -2,7 +2,7 @@
 import json
 import unittest
 
-from agent_comment_lint import report
+from agent_comment_lint import report, rules
 from agent_comment_lint.rules import Finding
 
 
@@ -125,3 +125,6 @@ class TestHookText(unittest.TestCase):
         result = report.Report("hook", 1, [("a.ts", finding("C1", 1, 2, "2-line prose block (limit 1)"))], [], 0)
         lines = report.hook_text(result, {"a.ts": text}, HEADER, CLOSING).splitlines()
         self.assertEqual(lines[3:5], ["    // a", "    // b"])
+
+    def test_every_rule_has_a_fix_line(self):
+        self.assertEqual(set(report.FIXES), set(rules.RULE_ORDER))

@@ -1065,6 +1065,14 @@ class TestHookMode(Sandbox):
                          (0, "", ""))
 
 
+class TestRunTexts(unittest.TestCase):
+    def test_only_a_text_with_findings_is_kept_for_the_hook_excerpt(self):
+        run = cli._Run("all")
+        run.judge("clean.ts", "const a = 1;\n")
+        run.judge("dirty.ts", "// one\n// two\nconst a = 1;\n")
+        self.assertEqual(sorted(run.texts), ["dirty.ts"])
+
+
 class TestSettingsEncoding(Sandbox):
     def test_a_settings_file_that_is_not_utf_8_is_a_could_not_scan(self):
         self.write("a.ts", "const a = 1;\n")
