@@ -4,7 +4,7 @@
 
 - Platforms: runs on macOS, Linux and native Windows, with CI on all three. The hook wrapper looks for Python as
   `AGENT_COMMENT_LINT_PYTHON`, then `python3`, `python` and `py -3`, and takes the first that is 3.9 or newer.
-  Roots are compared without regard to case where the file system ignores it. Moves nothing in the findings.
+  On Windows, the root containment check compares paths without regard to case. Moves nothing in the findings.
 - Hook, changed lines: in hook mode a write is judged only on the lines it adds or changes, and this is fast on
   large, repetitive files. Moves findings in hook mode only, and rarely: a comment elsewhere in the file no longer
   blocks a write, and a comment the write touches is judged as before. `--diff`, `--all` and `--files` are unchanged.
