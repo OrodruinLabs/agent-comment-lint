@@ -495,7 +495,7 @@ class TestWindsurfTemplate(unittest.TestCase):
         self.assertIn("agent-comment-lint-guard.cmd", handler["powershell"])
         self.assertIn("windsurf", handler["powershell"])
 
-    def run_hook(self, new_string, guards=(".sh", ".cmd")):
+    def run_hook(self, new_string, guards=(".sh", ".cmd"), profile=""):
         """Cascade runs `bash -c command`, or `powershell -Command powershell`, in the workspace root."""
         with tempfile.TemporaryDirectory() as tmp:
             root = os.path.join(os.path.realpath(tmp), "repo")
@@ -514,7 +514,7 @@ class TestWindsurfTemplate(unittest.TestCase):
             event["tool_info"] = {"file_path": os.path.join(root, "dirty.ts"),
                                   "edits": [{"old_string": "", "new_string": new_string}]}
             if os.name == "nt":
-                command = ["powershell", "-NoProfile", "-Command", self.handler()["powershell"]]
+                command = ["powershell", "-NoProfile", "-Command", profile + self.handler()["powershell"]]
             else:
                 command = [WINDSURF_BASH, "-c", self.handler()["command"]]
             return subprocess.run(command, input=json.dumps(event).encode("utf-8"), cwd=root, env=env,
@@ -536,6 +536,12 @@ class TestWindsurfTemplate(unittest.TestCase):
         done = self.run_hook("const a = 1;\n", guards=())
         self.assertEqual(done.returncode, 2)
         self.assertNotEqual(done.stderr.strip(), b"")
+
+    @unittest.skipUnless(os.name == "nt", "only the PowerShell form reads an exit code a profile left behind")
+    def test_a_missing_guard_is_blocked_after_a_profile_ran_a_native_command(self):
+        done = self.run_hook("const a = 1;\n", guards=(), profile="cmd /c exit 0; ")
+        self.assertEqual(done.returncode, 2)
+        self.assertIn(b"guard is missing", done.stderr)
 
 
 GEMINI_POSIX = os.path.join(REPO, "integrations", "gemini", "settings.json")
