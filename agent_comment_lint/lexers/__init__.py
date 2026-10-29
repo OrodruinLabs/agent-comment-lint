@@ -1,9 +1,9 @@
 """The language families the policy covers, and the one lookup from a path to its lexer."""
-from . import csharp, css, hashlike, javascript, python
+from . import csharp, css, hashlike, javascript, python, ruby
 from .base import Family, LexError, Line, Markers
 
 FAMILIES = (csharp.FAMILY, javascript.SCRIPT, javascript.JSX, css.FAMILY,
-            hashlike.SHELL, hashlike.YAML, hashlike.HCL, python.FAMILY)
+            hashlike.SHELL, hashlike.YAML, hashlike.HCL, python.FAMILY, ruby.FAMILY)
 
 EXTENSIONS = tuple(extension for family in FAMILIES for extension in family.extensions)
 NAMES = tuple(name for family in FAMILIES for name in family.names)

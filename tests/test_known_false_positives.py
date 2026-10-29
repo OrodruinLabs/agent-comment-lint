@@ -55,3 +55,17 @@ class TestAgentContextFalsePositivesInCpython(unittest.TestCase):
         text = "# Map conditions (per the spec) to signals\n"
         self.assertEqual(engine.check_text("a.py", text, self.AGENT_CONTEXT).findings[0].message,
                          "governance reference 'per the spec'")
+
+
+class TestRubyLiteralsTheLineScannerDoesNotKnow(unittest.TestCase):
+    def test_a_character_literal_of_a_hash_reads_a_comment(self):
+        # The line scanner does not know Ruby's `?#` character literal.
+        self.assertEqual(found("a.rb", "x = ?#docs/prefix\n"), [("C3", 1)])
+
+    def test_a_percent_word_list_with_a_hash_reads_a_comment(self):
+        # The line scanner does not know Ruby's percent literals.
+        self.assertEqual(found("a.rb", "%w[a #docs/prefix]\n"), [("C3", 1)])
+
+    def test_a_regex_literal_with_a_hash_reads_a_comment(self):
+        # The line scanner does not know Ruby's regex literals.
+        self.assertEqual(found("a.rb", "/#docs/prefix/ =~ s\n"), [("C3", 1)])

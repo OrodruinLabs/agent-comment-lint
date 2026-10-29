@@ -4,10 +4,10 @@
   entry: agent-comment-lint --files
   language: python
   pass_filenames: true
-  files: \.(cs|ts|tsx|mts|cts|js|jsx|mjs|cjs|css|sh|ya?ml|tf|tfvars|hcl|py)$
+  files: (\.(cs|ts|tsx|mts|cts|js|jsx|mjs|cjs|css|sh|ya?ml|tf|tfvars|hcl|py|rb|rake|gemspec)|(^|/)(Gemfile|Rakefile))$
 - id: agent-comment-lint-staged
   name: agent-comment-lint (staged lines)
   entry: agent-comment-lint --staged
   language: python
   pass_filenames: false
-  files: \.(cs|ts|tsx|mts|cts|js|jsx|mjs|cjs|css|sh|ya?ml|tf|tfvars|hcl|py)$
+  files: (\.(cs|ts|tsx|mts|cts|js|jsx|mjs|cjs|css|sh|ya?ml|tf|tfvars|hcl|py|rb|rake|gemspec)|(^|/)(Gemfile|Rakefile))$
