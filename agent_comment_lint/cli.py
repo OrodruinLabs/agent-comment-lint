@@ -22,6 +22,7 @@ BINARY_NOT_TEXT = "git shows no changed lines for it (a binary file) and it is n
 HOOK_INPUT = "standard input is not a Claude Code PreToolUse event: %s"
 HOOK_NOT_UTF8 = "is not UTF-8 text, so the write cannot be judged"
 HOOK_BLOCKED = "Blocked: agent-comment-lint rejects this write.\n"
+HOOK_HEADER = HOOK_BLOCKED + report.HOOK_SCOPE
 
 
 def _parser():
@@ -161,9 +162,12 @@ class _Run:
         self.unresolved = 0
         self.findings = []
         self.errors = []
+        self.texts = {}
+        self.tool = None
         self.governance = settings.EMPTY.governance
 
     def judge(self, path, text, ranges=None):
+        self.texts[path] = text
         try:
             result = engine.check_text(path, text, self.governance)
         except LexError as error:
@@ -276,6 +280,7 @@ def _run_hook(run, root, cwd, load_config, stdin, follow_worktrees):
     if settings.excluded(config, relative):
         return
     run.governance = config.governance
+    run.tool = target.tool
     try:
         try:
             current = _current_text(root, relative)
@@ -304,7 +309,7 @@ def _execute(args, cwd, stdin):
             # A write the hook never judges must not depend on the settings file.
             _run_hook(run, root, cwd, lambda judged_root: _load_config(args, judged_root, cwd), stdin,
                       follow_worktrees=not args.root)
-            return run.report()
+            return run
         config = _load_config(args, root, cwd)
         run.governance = config.governance
         if run.mode == "all":
@@ -325,15 +330,19 @@ def _execute(args, cwd, stdin):
         run.errors.append(("git", None, str(error)))
     except settings.ConfigError as error:
         run.errors.append((args.config or settings.CONFIG_NAME, None, str(error)))
-    return run.report()
+    return run
 
 
-def _hook_verdict(result, stderr):
+def _hook_closing(tool):
+    """The lines that end a blocked write's message; a Write also learns to re-send only the comment lines."""
+    return report.HOOK_CLOSING + ((report.WRITE_RETRY,) if tool == "Write" else ())
+
+
+def _hook_verdict(run_result, texts, tool, stderr):
     """Claude Code blocks a write when its hook exits 2 and shows the agent standard error; a clean write is silent."""
-    if not report.exit_code(result):
+    if not report.exit_code(run_result):
         return 0
-    out, err = report.as_text(result)
-    stderr.write(HOOK_BLOCKED + out + err)
+    stderr.write(report.hook_text(run_result, texts, HOOK_HEADER, _hook_closing(tool)))
     return 2
 
 
@@ -347,11 +356,12 @@ def main(argv=None, stdin=None, stdout=None, stderr=None, cwd=None):
         parser.error("--json does not apply to --hook, whose verdict is its exit code")
     if args.hook:
         try:
-            return _hook_verdict(_execute(args, cwd or os.getcwd(), stdin or sys.stdin), stderr)
+            run = _execute(args, cwd or os.getcwd(), stdin or sys.stdin)
+            return _hook_verdict(run.report(), run.texts, run.tool, stderr)
         except Exception as error:
-            stderr.write("%s--hook: could not scan: %s: %s\n" % (HOOK_BLOCKED, type(error).__name__, error))
+            stderr.write("%s--hook: could not scan: %s: %s\n" % (HOOK_HEADER, type(error).__name__, error))
             return 2
-    result = _execute(args, cwd or os.getcwd(), stdin or sys.stdin)
+    result = _execute(args, cwd or os.getcwd(), stdin or sys.stdin).report()
     if args.json:
         stdout.write(report.as_json(result))
         stderr.write(report.as_text(result)[1])

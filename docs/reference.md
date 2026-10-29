@@ -283,7 +283,23 @@ accident.
 `--hook` reads the event Claude Code sends a PreToolUse hook. The file the write would leave is judged whole, and a
 finding counts only where it overlaps a line the write adds or changes.
 
-- The report on standard error starts with the line `Blocked: agent-comment-lint rejects this write.`
+- The report on standard error quotes each offending comment and says how to fix it, then closes with what not to
+  try. A `Write` also gets a line telling it to re-send with only the comment lines changed. For example:
+
+  ```
+  Blocked: agent-comment-lint rejects this write.
+  Only the lines this write adds or changes are judged; comments elsewhere in the file are fine.
+  a.ts:1: C1: 2-line prose block (limit 1)
+      // one
+      // two
+    Fix: Keep one line that says why the code is this way; put the rest in the commit message or the PR description.
+  agent-comment-lint: 1 violation(s) in 1 of 1 file(s) scanned.
+  Fix the comment and retry the same tool call.
+  Splitting the comment across blank lines, or writing the file another way (Bash, a script, another tool), does not satisfy the policy.
+  Adding an exclusion to .agent-comment-lint.json is not the fix: exclusions are for generated and third-party code.
+  ```
+
+  An excerpt shows at most 6 lines of the comment, each cut at 120 characters.
 - A crash inside the hook is also exit code 2 with that header, never exit code 1, which Claude Code does not block on.
 - The plugin's hook entry sets `"onFailure": "block"`, so a hook that times out blocks the write.
 - Known limit: Claude Code also matches curly quotes against straight ones and tries escape variants of

@@ -72,3 +72,50 @@ class TestJson(unittest.TestCase):
 
     def test_the_same_run_serializes_to_the_same_bytes(self):
         self.assertEqual(report.as_json(make([B7, A9, B2])), report.as_json(make([B2, A9, B7])))
+
+
+HEADER = "Blocked: x\n" + report.HOOK_SCOPE
+CLOSING = ("Fix the comment and retry the same tool call.",)
+
+
+def finding(rule, line, end_line, message):
+    return Finding(rule, line, end_line, message)
+
+
+class TestHookText(unittest.TestCase):
+    def test_a_hook_report_quotes_the_comment_and_says_how_to_fix_it(self):
+        result = report.Report("hook", 1, [("a.ts", finding("C1", 1, 2, "2-line prose block (limit 1)"))], [], 0)
+        text = report.hook_text(result, {"a.ts": "// one\n// two\nconst a = 1;\n"}, HEADER, CLOSING)
+        self.assertEqual(text.splitlines()[:6], [
+            "Blocked: x",
+            "Only the lines this write adds or changes are judged; comments elsewhere in the file are fine.",
+            "a.ts:1: C1: 2-line prose block (limit 1)",
+            "    // one",
+            "    // two",
+            "  Fix: " + report.FIXES["C1"],
+        ])
+        self.assertTrue(text.endswith("Fix the comment and retry the same tool call.\n"))
+
+    def test_a_long_block_shows_six_lines_and_counts_the_rest(self):
+        body = "".join("// line %d\n" % n for n in range(1, 10))
+        result = report.Report("hook", 1, [("a.ts", finding("C1", 1, 9, "9-line prose block (limit 1)"))], [], 0)
+        text = report.hook_text(result, {"a.ts": body}, HEADER, CLOSING)
+        self.assertIn("    // line 6\n    \u2026 3 more line(s)\n", text)
+        self.assertNotIn("// line 7", text)
+
+    def test_a_long_line_is_cut_at_the_excerpt_width(self):
+        line = "x = 1  # " + "y" * 150
+        result = report.Report("hook", 1, [("a.py", finding("C7", 1, 1, "159-character line (limit 120)"))], [], 0)
+        excerpt = report.hook_text(result, {"a.py": line + "\n"}, HEADER, CLOSING).splitlines()[3]
+        self.assertEqual(excerpt, "    " + line[:119] + "\u2026")
+
+    def test_errors_keep_their_form_and_get_no_closing_lines(self):
+        result = report.Report("hook", 0, [], [("a.ts", 3, "unterminated string")], 0)
+        text = report.hook_text(result, {}, HEADER, CLOSING)
+        self.assertIn("a.ts:3: could not scan: unterminated string\n", text)
+        self.assertNotIn("retry", text)
+
+    def test_a_finding_with_no_text_keeps_its_finding_and_fix_lines(self):
+        result = report.Report("hook", 1, [("a.ts", finding("C3", 4, 4, "governance reference 'ADR-1'"))], [], 0)
+        lines = report.hook_text(result, {}, HEADER, CLOSING).splitlines()
+        self.assertEqual(lines[2:4], ["a.ts:4: C3: governance reference 'ADR-1'", "  Fix: " + report.FIXES["C3"]])

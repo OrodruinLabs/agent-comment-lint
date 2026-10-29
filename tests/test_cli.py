@@ -10,7 +10,7 @@ import unittest
 
 from unittest import mock
 
-from agent_comment_lint import __version__, cli, gitio
+from agent_comment_lint import __version__, cli, gitio, report
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TWO_BLOCKS = "// one\n// two\nint x;\n// three\n// four\n"
@@ -904,6 +904,17 @@ class TestHookMode(Sandbox):
         result = self.hook(event("Edit", "a.ts", old_string="const a = 1;\n",
                                  new_string="// one\n// two\nconst a = 1;\n"))
         self.assert_blocked(result, "a.ts:1: C1: 2-line prose block (limit 1)")
+
+    def test_a_blocked_edit_shows_the_comment_and_the_fix(self):
+        self.write("a.ts", "const a = 1;\n")
+        result = self.hook(event("Edit", "a.ts", old_string="const a = 1;\n",
+                                 new_string="// one\n// two\nconst a = 1;\n"))
+        self.assert_blocked(result, "a.ts:1: C1: 2-line prose block (limit 1)\n    // one\n    // two\n  Fix: ",
+                            "Only the lines this write adds or changes are judged", report.HOOK_CLOSING[0])
+        self.assertNotIn(report.WRITE_RETRY, result[2])
+
+    def test_a_blocked_write_is_told_to_resend_only_the_comment_lines(self):
+        self.assert_blocked(self.hook(event("Write", "new.ts", content="// see ADR-9\n")), report.WRITE_RETRY)
 
     def test_an_old_finding_elsewhere_does_not_block(self):
         self.write("a.ts", "// one\n// two\nconst a = 1;\n")
