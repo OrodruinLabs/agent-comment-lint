@@ -358,31 +358,30 @@ governance list are the policy. There is no inline suppression.
   (`///`, `//!`, `/** */`, `/*! */`) follow C1, and an attribute is code.
 - In Go, Java and Rust a block comment, string, text block, raw string, rune or character literal that never closes is
   exit code 2.
-- SQL is lexed across lines, in one of two modes. A file is read as MySQL when, outside strings, comments,
-  dollar-quoted bodies and psql commands, it holds a `/*!` or MariaDB `/*M!` comment, a backtick name, a statement
-  that opens with `#` and a non-space, or a `DELIMITER` command at the start of a line and of a statement. Any other
-  file is read as standard SQL, which fits PostgreSQL, SQLite and T-SQL. A first line that starts `#!` is code and no
-  marker. When the standard reading cannot lex a file before it meets a marker, the MySQL reading is used if it lexes
-  and meets one. A MySQL file with no marker is read as standard SQL. In standard SQL `--` always opens a comment, and
-  `#` opens one only before a space or the end of the line and when no operator character comes right before it, so
-  `#>`, `#>>`, `#-`, `p ## l` and `a ?# b` are code. In MySQL `#` always opens a comment, and `--` only before a space
-  or the end of the line, so `1--1` is code. A `'...'` string may span lines and takes `''` as a quote. A backslash
-  escapes the next character in MySQL and in a Postgres `E'...'` string, and is a plain character in other strings,
-  so `'C:\'` is complete. A `"..."` name and a MySQL backtick name are content; in MySQL `"..."` is a string with the
-  same escapes as `'...'`. A T-SQL `[...]` name is code. In standard SQL a dollar quote, `$$` or `$name$`, opens where
-  no letter, digit, `_`, `$` or non-ASCII character comes right before it, so `$1` opens none, and it may open right
-  after another one closes. A tag may hold any non-ASCII character, as a Postgres name may. Its body is lexed as SQL,
-  so the comments of a plpgsql function are judged, and a body that does not lex is content instead. In standard SQL
-  a backslash outside strings and comments starts a psql command, such as `\set`, `\echo` or `\gset`, that runs to
-  the end of its line. The command is code: nothing in it opens a string, a quoted name, a dollar quote or a comment,
-  and no marker in it counts. It ends the open statement as `;` does. After a psql `COPY ... FROM stdin` whose
-  `FROM stdin` stands outside parentheses, or a `\copy ... from stdin` command, the lines up to one that is exactly
-  `\.`, or to the end of the file, are table rows and are content. A `/*!` or `/*M!` executable comment and a `/*+`
-  hint are code, never prose. Block comments do not nest. A string, quoted name, block comment or dollar quote that
-  never closes is exit code 2. It does not know Oracle `q'[...]'` quoting or SQL\*Plus commands such as `REM` and
-  `PROMPT`, and dbt and Jinja templates are read as SQL too. An executable comment ends at its first `*/`, even one
-  inside a string. A block comment that opens after the `;` of a `COPY ... FROM stdin` line and spans lines stays a
-  comment, and the rows start after it.
+- SQL is lexed across lines, in one of two modes. A file is read as MySQL when, outside strings, comments, dollar-quoted
+  bodies and psql commands, it holds a `/*!` or MariaDB `/*M!` comment, a backtick name, a statement that opens with `#`
+  and a non-space, or a `DELIMITER` command at the start of a line and of a statement. Any other file is read as
+  standard SQL, which fits PostgreSQL, SQLite and T-SQL. A first line that starts `#!` is code and no marker. When the
+  standard reading cannot lex a file before it meets a marker, the MySQL reading is used if it lexes and meets one. A
+  MySQL file with no marker is read as standard SQL. In standard SQL `--` always opens a comment, and `#` opens one only
+  before a space or the end of the line and when no operator character comes right before it, so `#>`, `#>>`, `#-`, `p
+  ## l` and `a ?# b` are code. In MySQL `#` always opens a comment, and `--` only before a space or the end of the line,
+  so `1--1` is code. A `'...'` string may span lines and takes `''` as a quote. A backslash escapes the next character
+  in MySQL and in a Postgres `E'...'` string, and is a plain character in other strings, so `'C:\'` is complete. A
+  `"..."` name and a MySQL backtick name are content; in MySQL `"..."` is a string with the same escapes as `'...'`. A
+  T-SQL `[...]` name is code. In standard SQL a dollar quote, `$$` or `$name$`, opens where no letter, digit, `_`, `$`
+  or non-ASCII character comes right before it, so `$1` opens none, and it may open right after another one closes. A
+  tag may hold any non-ASCII character, as a Postgres name may. Its body is lexed as SQL, so the comments of a plpgsql
+  function are judged, and a body that does not lex is content instead. In standard SQL a backslash outside strings,
+  comments and dollar-quoted bodies starts a psql command, such as `\set`, `\echo` or `\gset`, that runs to the end of
+  its line. The command is code: nothing in it opens a string, a quoted name, a dollar quote or a comment, and no marker
+  in it counts. It ends the open statement as `;` does. After a psql `COPY ... FROM stdin` whose `FROM stdin` stands
+  outside parentheses, or a `\copy ... from stdin` command, the lines up to one that is exactly `\.`, or to the end of
+  the file, are table rows and are content. A `/*!` or `/*M!` executable comment and a `/*+` hint are code, never prose.
+  Block comments do not nest. A string, quoted name, block comment or dollar quote that never closes is exit code 2. It
+  does not know Oracle `q'[...]'` quoting or SQL\*Plus commands such as `REM` and `PROMPT`, and dbt and Jinja templates
+  are read as SQL too. An executable comment ends at its first `*/`, even one inside a string. A block comment that
+  opens after the `;` of a `COPY ... FROM stdin` line and spans lines stays a comment, and the rows start after it.
 - The engine and the lexers break lines where Python's `str.splitlines` does: at U+2028, U+2029, U+0085, `\x0b`,
   `\x0c`, `\x1c`, `\x1d` and `\x1e`, though most of the languages read here do not. A string, rune or character
   literal holding one is exit code 2 where it must close on its line: in Go, Java, CSS, and JavaScript and TypeScript
@@ -419,7 +418,7 @@ accident.
 | SQL | A dollar-quoted body is lexed as SQL whenever it can be, also when it is a plain string literal, so a `--` or `/*` inside one starts a comment. | `SELECT $$ -- see ADR-9 $$;` is C3 |
 | SQL | A `'` inside a T-SQL bracketed name `[...]` starts a string, which can swallow the comments after it or never close. One that never closes is exit code 2. | `SELECT [it's] FROM t;` is exit code 2 |
 | SQL | A backtick name makes the file MySQL, where a backslash escapes a quote. SQLite takes backtick names too but reads a backslash as a plain character, so a string that ends in one never closes, and that is exit code 2. | ``CREATE TABLE `t`(p TEXT DEFAULT 'C:\');`` is exit code 2 |
-| SQL | A MySQL file with no marker is read as standard SQL, where a `\'` ends its string, so with two such escapes the text between them is one string and the comments in it are not judged. | `INSERT INTO t VALUES ('O\'Brien');` / `-- see ADR-9` / `INSERT INTO t VALUES ('D\'Arcy');` reports nothing |
+| SQL | A MySQL file with no marker is read as standard SQL, where a `\'` ends its string, so with two such escapes the text between them is one string and the comments in it are not judged. A backslash such a misread leaves outside a string starts a psql command, which can also hide a quote that would otherwise have left the file exit 2. | `INSERT INTO t VALUES ('O\'Brien');` / `-- see ADR-9` / `INSERT INTO t VALUES ('D\'Arcy');` reports nothing |
 | SQL | An executable comment ends at its first `*/`, also one inside a string, so the quote after it opens a string, and one that never closes is exit code 2. | `/*!40101 SET @a = '*/' */;` is exit code 2 |
 | SQL | Oracle `q'[...]'` quoting is not known, so a `'` inside the brackets ends the string, and one that never closes is exit code 2. | `SELECT q'[it's]' FROM dual;` is exit code 2 |
 | SQL | A `#` that starts a statement marks a MySQL file, also the name of a T-SQL temporary procedure called without `EXEC`. Then every `#` opens a comment, also the one in a `#t` temporary table name. | `#load_rows` / `GO` / `INSERT INTO #t VALUES ('C:\'); -- see ADR-9` reads `#t VALUES ...` as a comment |
