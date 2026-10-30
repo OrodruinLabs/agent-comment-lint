@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.7.0
+
+- SQL is read (`.sql`), in two modes. A file that shows a MySQL marker (a `/*!` comment, a backtick name, a
+  statement opened by `#`, or a `DELIMITER` command) is read the MySQL way, and any other file as standard SQL, which
+  fits PostgreSQL, SQLite and T-SQL. Strings and quoted names are content. A Postgres dollar-quoted body is lexed as
+  SQL, so the comments in a plpgsql function are judged, and a body that does not lex is content. psql
+  `COPY ... FROM stdin` rows are content, and `/*!` executable comments and `/*+` hints are code. A string, quoted
+  name, block comment or dollar quote that never closes is exit code 2.
+- Both `.pre-commit-hooks.yaml` ids match `.sql` files.
+- Findings move only for `.sql` files, which were skipped before. Nothing moves for any other file.
+- Codex CLI is supported: it has been seen blocking a write live, in Codex CLI 0.146.1 on macOS. Gemini CLI and
+  Windsurf stay in preview.
+- README: both icon grids have equal boxes, and every icon has one color that reads on light and dark pages. PyPI
+  shows them all. The README names every agent, not only Claude Code, and its badge links to PyPI.
+- CI: the Python 3.9 job runs on ubuntu-24.04, the last Ubuntu image with a Python 3.9 build.
+
 ## 1.6.0
 
 - Three more languages are read: Go (`.go`), Java (`.java`) and Rust (`.rs`). Go keeps backtick raw strings and runes

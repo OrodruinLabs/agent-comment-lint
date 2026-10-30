@@ -18,9 +18,9 @@ moves.
 
 **Your CLAUDE.md or AGENTS.md asks; this enforces.**
 
-agent-comment-lint holds every comment to one line, with no ticket or plan references. Inside Claude Code, and in
-preview inside Codex CLI, Gemini CLI and Windsurf, it blocks the write before the comment lands and shows the agent
-why, so the agent can rewrite it. The same check runs in CI, in pre-commit and from the command line.
+agent-comment-lint holds every comment to one line, with no ticket or plan references. Inside Claude Code and
+Codex CLI, and in preview inside Gemini CLI and Windsurf, it blocks the write before the comment lands and shows the
+agent why, so the agent can rewrite it. The same check runs in CI, in pre-commit and from the command line.
 
 ```
 src/a.ts:12: C1: 3-line prose block (limit 1)
@@ -32,7 +32,7 @@ agent-comment-lint: 2 violation(s) in 1 of 57 file(s) scanned.
 
 | Rule | Fails when |
 | :--- | :--- |
-| C1 | A comment has more than one line of prose. Consecutive `//` or `#` lines, a multi-line `/* */` and a Python docstring each count as one comment. One-line tags such as `@param` do not count, and neither do rulers like `// ----` or other lines without a letter or digit. |
+| C1 | A comment has more than one line of prose. Consecutive `//`, `#` or `--` lines, a multi-line `/* */` and a Python docstring each count as one comment. One-line tags such as `@param` do not count, and neither do rulers like `// ----` or other lines without a letter or digit. |
 | C3 | A comment names a ticket, pull request, decision record, plan or doc path, such as `ADR-9`, `PR 519`, `work item 1234`, `docs/x.md` or `CLAUDE.md`. |
 | C5 | An assertion message built with `+ "..."` spans more than two lines. |
 | C7 | A line that carries a comment is over 120 characters. |
@@ -61,7 +61,7 @@ The numbers skip because C2, C4 and C6 need a compiler or human judgment, and th
     <td align="center"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/go/go-original.svg" width="72" height="32" alt=""><br><sub>Go</sub></td>
     <td align="center"><img src="https://cdn.jsdelivr.net/gh/devicons/devicon@v2.16.0/icons/java/java-original.svg" width="72" height="32" alt=""><br><sub>Java</sub></td>
     <td align="center"><img src="https://cdn.jsdelivr.net/gh/OrodruinLabs/agent-comment-lint@4cbb5bc1dbcf0d0fd808117d77d8d021d3402b8f/docs/icons/rust.svg" width="72" height="32" alt=""><br><sub>Rust</sub></td>
-    <td></td>
+    <td align="center"><img src="https://cdn.jsdelivr.net/gh/OrodruinLabs/agent-comment-lint@39f26dc1b688a1b1d14ac8232c3f6a86411009ee/docs/icons/sql.svg" width="72" height="32" alt=""><br><sub>SQL</sub></td>
   </tr>
 </table>
 </div>
@@ -76,7 +76,7 @@ JSX and TSX are included. Other files are skipped, and so are dependency and bui
 <table>
   <tr>
     <td align="center"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/claude-color.svg" width="72" height="32" alt=""><br><sub><b>Claude Code</b><br>Supported</sub></td>
-    <td align="center"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/codex-color.svg" width="72" height="32" alt=""><br><sub><b>Codex CLI</b><br>Preview</sub></td>
+    <td align="center"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/codex-color.svg" width="72" height="32" alt=""><br><sub><b>Codex CLI</b><br>Supported</sub></td>
     <td align="center"><img src="https://cdn.jsdelivr.net/gh/OrodruinLabs/agent-comment-lint@4cbb5bc1dbcf0d0fd808117d77d8d021d3402b8f/docs/icons/windsurf.svg" width="72" height="32" alt=""><br><sub><b>Windsurf</b><br>Preview</sub></td>
     <td align="center"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/gemini-color.svg" width="72" height="32" alt=""><br><sub><b>Gemini CLI</b><br>Preview</sub></td>
     <td align="center"><img src="https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.95.0/icons/copilot-color.svg" width="72" height="32" alt=""><br><sub><b>Copilot</b><br>Planned</sub></td>
@@ -87,13 +87,14 @@ JSX and TSX are included. Other files are skipped, and so are dependency and bui
 </table>
 </div>
 
+**Supported** agents have been seen blocking a write live.
 **Preview** adapters are built from the agent's hook documentation and have not yet been seen blocking a write live.
 **Planned** agents wait for one captured hook event, because their docs do not say what a file write looks like.
 The details for each agent are in [the reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#other-coding-agents).
 
 ## Setup
 
-Pick where it runs; every channel runs the same check. The snippets pin `v1.6.0`. Keep a pin, so a new release never
+Pick where it runs; every channel runs the same check. The snippets pin `v1.7.0`. Keep a pin, so a new release never
 changes your results without a commit of yours.
 
 ### Claude Code
@@ -111,7 +112,7 @@ through Bash, on the lines changed since the session started and not yet committ
 ### Other coding agents
 
 For Codex CLI, Windsurf / Devin and Gemini CLI, install the command as under [Command line](#command-line), then copy
-the agent's template from `integrations/` and the guard scripts at the `v1.6.0` tag. The steps for each agent are in
+the agent's template from `integrations/` and the guard scripts at the `v1.7.0` tag. The steps for each agent are in
 [the reference](https://github.com/OrodruinLabs/agent-comment-lint/blob/main/docs/reference.md#other-coding-agents).
 
 ### GitHub Actions
@@ -125,7 +126,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: OrodruinLabs/agent-comment-lint@v1.6.0
+      - uses: OrodruinLabs/agent-comment-lint@v1.7.0
 ```
 
 Only the lines the pull request changes are checked. Keep `fetch-depth: 0`, or the step cannot see what changed and
@@ -137,7 +138,7 @@ lists them all. The inputs are in [the reference](https://github.com/OrodruinLab
 ```yaml
 repos:
   - repo: https://github.com/OrodruinLabs/agent-comment-lint
-    rev: v1.6.0
+    rev: v1.7.0
     hooks:
       - id: agent-comment-lint-staged
 ```
@@ -151,15 +152,15 @@ staged, so it judges nothing. In CI, use the GitHub Action (or `--diff`), or the
 ### Command line
 
 ```
-uv tool install agent-comment-lint==1.6.0
-pipx install agent-comment-lint==1.6.0
+uv tool install agent-comment-lint==1.7.0
+pipx install agent-comment-lint==1.7.0
 ```
 
 To install from the repository instead:
 
 ```
-uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.6.0
-pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.6.0
+uv tool install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.7.0
+pipx install git+https://github.com/OrodruinLabs/agent-comment-lint@v1.7.0
 ```
 
 `uvx agent-comment-lint` runs it without installing, which suits CI and trials.
@@ -190,7 +191,7 @@ are no limits to change and no way to silence one comment inline. Every entry st
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.6.0/schema/agent-comment-lint.schema.json",
+  "$schema": "https://raw.githubusercontent.com/OrodruinLabs/agent-comment-lint/v1.7.0/schema/agent-comment-lint.schema.json",
   "exclude": [{ "path": "vendor/", "reason": "third-party code" }],
   "governance": {
     "packs": ["azure-boards"],
