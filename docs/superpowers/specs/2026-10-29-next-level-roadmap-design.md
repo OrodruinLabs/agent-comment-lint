@@ -567,6 +567,12 @@ override this before v1.6.0 is tagged:
    block would fail either way. Multi-line Javadoc, Go package docs and Rust `///` docs are blocked, as Python
    docstrings and JSDoc already are. The order stays Go, Java and Rust, then Kotlin, Swift and C/C++.
 
+Decided by the owner on 2026-10-30:
+
+8. **SQL is release 1.7.0.** It fills the README's sixteenth language box. Kotlin, Swift and C/C++ move to 1.8.0.
+9. **The README icon grids are always full.** Every box is the same size, and no row has an empty box. Each release
+   chooses its languages, or the row length, so that the count divides evenly.
+
 ## 10. Left to the builder
 
 - **Code structure:**
