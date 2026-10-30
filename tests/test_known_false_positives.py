@@ -162,3 +162,31 @@ class TestSqlShapesOtherDialectsReadDifferently(unittest.TestCase):
         # Backtick names make the file MySQL, where `\'` escapes a quote, but SQLite reads `'C:\'` as a whole string.
         with self.assertRaises(LexError):
             engine.check_text("a.sql", "CREATE TABLE `t`(p TEXT DEFAULT 'C:\\');\n-- see ADR-9\n")
+
+    def test_a_mysql_file_with_no_marker_and_two_escaped_quotes_reads_as_standard_sql(self):
+        # Read the standard way, each `\'` ends its string, so the text between the two escapes is one string.
+        text = "INSERT INTO t VALUES ('O\\'Brien');\n-- see ADR-9\nINSERT INTO t VALUES ('D\\'Arcy');\n"
+        self.assertEqual(found("a.sql", text), [])
+
+    def test_a_close_inside_a_string_in_an_executable_comment_ends_the_comment(self):
+        # An executable comment ends at its first `*/`, so the quote after it opens a string that never closes.
+        with self.assertRaises(LexError):
+            engine.check_text("a.sql", "/*!40101 SET @a = '*/' */;\n")
+
+    def test_an_oracle_q_quote_is_read_as_a_plain_string(self):
+        # Oracle `q'[...]'` is not known, so the `'` inside its brackets ends the string and the last one never closes.
+        with self.assertRaises(LexError):
+            engine.check_text("a.sql", "SELECT q'[it's]' FROM dual;\n")
+
+    def test_a_temporary_procedure_called_without_exec_at_the_start_of_a_file_switches_to_mysql(self):
+        # A `#` that starts a statement marks MySQL, where every later `#t` opens a comment.
+        text = "#load_rows\nGO\nINSERT INTO #t VALUES ('C:\\'); -- see ADR-9\nGO\n"
+        self.assertEqual(comments("a.sql", text), [["#load_rows"], [], ["#t VALUES ('C:\\'); -- see ADR-9"], []])
+
+    def test_a_delimiter_after_code_or_a_comment_on_its_line_does_not_switch(self):
+        # A `DELIMITER` command switches only at the start of a line, so `$$` here opens dollar quotes.
+        procedures = "CREATE PROCEDURE a() BEGIN SELECT 1; END $$\nCREATE PROCEDURE b() BEGIN SELECT 2; END $$\n"
+        for first in ("/* setup */ DELIMITER $$\n", "SET x = 1; DELIMITER $$\n"):
+            with self.assertRaises(LexError) as caught:
+                engine.check_text("a.sql", first + procedures + "DELIMITER ;\n")
+            self.assertEqual((caught.exception.line, caught.exception.message), (3, "unterminated dollar quote"))

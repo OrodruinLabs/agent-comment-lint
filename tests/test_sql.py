@@ -76,13 +76,6 @@ class TestDialect(unittest.TestCase):
         text = "SELECT 1; -- one\n/* two */\nDELIMITER $$\nCREATE PROCEDURE a() BEGIN SELECT 1--1; END $$\n"
         self.assertEqual(comments("a.sql", text), [["-- one"], ["/* two */"], [], []])
 
-    def test_a_delimiter_after_code_or_a_comment_on_its_line_does_not_switch(self):
-        procedures = "CREATE PROCEDURE a() BEGIN SELECT 1; END $$\nCREATE PROCEDURE b() BEGIN SELECT 2; END $$\n"
-        for first in ("/* setup */ DELIMITER $$\n", "SET x = 1; DELIMITER $$\n"):
-            with self.assertRaises(LexError) as caught:
-                found("a.sql", first + procedures + "DELIMITER ;\n")
-            self.assertEqual((caught.exception.line, caught.exception.message), (3, "unterminated dollar quote"))
-
     def test_a_hash_that_starts_a_statement_switches_to_mysql(self):
         text = ("#Create the users' table\nCREATE TABLE `users` (`id` INT); -- see ADR-9\n#Don't forget the index\n"
                 "CREATE INDEX i ON users (id);\n")
@@ -104,6 +97,14 @@ class TestDialect(unittest.TestCase):
         text = ("\\set today `date +%F`\nCREATE FUNCTION f(d jsonb) RETURNS text AS $$\n"
                 "  SELECT d #>> '{a}';\n$$ LANGUAGE sql;\n")
         self.assertEqual(comments("a.sql", text), [[], [], [], []])
+
+    def test_a_shebang_is_code_that_opens_in_a_string_and_marks_nothing(self):
+        self.assertEqual(found("a.sql", "#!/usr/bin/env psql\n-- one line\n"), [])
+        self.assertEqual(opens("#!/usr/bin/env psql\nSELECT 1;\n"), [STRING, CODE])
+        self.assertEqual(comments("a.sql", "#!/usr/bin/env psql\nSELECT 1--1;\n"), [[], ["--1;"]])
+
+    def test_a_mariadb_executable_comment_switches_to_mysql(self):
+        self.assertEqual(comments("a.sql", "/*M!100316 SET x = 1 */;\nSELECT 1--1;\n"), [[], []])
 
 
 class TestDashComments(unittest.TestCase):
@@ -135,6 +136,9 @@ class TestHashComments(unittest.TestCase):
     def test_a_hash_before_a_space_or_a_line_end_opens_a_comment(self):
         self.assertEqual(found("a.sql", "# one\n# two\nSELECT 1;\n"), [("C1", 1)])
         self.assertEqual(comments("a.sql", "SELECT 1; #\n"), [["#"]])
+
+    def test_a_hash_after_an_operator_character_is_code(self):
+        self.assertEqual(comments("a.sql", "SELECT p ## l, a ?# b FROM t; -- see ADR-9\n"), [["-- see ADR-9"]])
 
     def test_a_hash_always_opens_a_comment_in_mysql(self):
         self.assertEqual(found("a.sql", MYSQL + "SELECT 1#see ADR-9\n"), [("C3", 2)])
@@ -170,6 +174,12 @@ class TestBlockComments(unittest.TestCase):
     def test_an_optimizer_hint_is_code(self):
         self.assertEqual(found("a.sql", "SELECT /*+ see ADR-9 %s */ 1;\n" % LONG), [])
         self.assertEqual(comments("a.sql", "SELECT /*+ SeqScan(t) */ 1;\n"), [[]])
+
+    def test_a_mariadb_executable_comment_is_code(self):
+        self.assertEqual(found("a.sql", "/*M!100316 see ADR-9 %s */;\n" % LONG), [])
+        text = "/*M!100316 SET\n-- one\n-- two\n*/;\n"
+        self.assertEqual(found("a.sql", text), [])
+        self.assertEqual(opens(text), [CODE, STRING, STRING, STRING])
 
     def test_the_lines_an_executable_comment_spans_open_in_a_string(self):
         text = "/*!50003 CREATE\n-- one\n-- two\n*/;\nSELECT /*+\n see ADR-9 */ 1;\n"
@@ -294,6 +304,15 @@ class TestDollarQuoting(unittest.TestCase):
     def test_a_parameter_or_a_dollar_inside_a_word_opens_nothing(self):
         self.assertEqual(found("a.sql", "SELECT $1, a$b$, c$$ -- see ADR-9\n"), [("C3", 1)])
 
+    def test_a_dollar_quote_may_open_right_after_one_closes(self):
+        self.assertEqual(comments("a.sql", "SELECT $a$x$a$$b$ -- one\n-- two\n$b$;\n"), [["-- one"], ["-- two"], []])
+
+    def test_tags_and_words_take_non_ascii_letters(self):
+        text = "COMMENT ON TABLE t IS $fn_\u00f3$it's$fn_\u00f3$;\n-- see ADR-9\n"
+        self.assertEqual(found("a.sql", text), [("C3", 2)])
+        self.assertEqual(found("a.sql", "SELECT caf\u00e9$$ -- see ADR-9\n"), [("C3", 1)])
+        self.assertEqual(found("a.sql", "SELECT na\u00efvE'C:\\', 1 -- see ADR-9\n"), [("C3", 1)])
+
     def test_a_dollar_quote_opens_nothing_in_mysql(self):
         self.assertEqual(found("a.sql", MYSQL + "SELECT $$ -- see ADR-9\n"), [("C3", 2)])
 
@@ -361,6 +380,16 @@ class TestCopyData(unittest.TestCase):
         self.assertEqual(found("a.sql", "COPY t TO stdout /* not from stdin */;\n-- see ADR-9\n"), [("C3", 2)])
         self.assertEqual(found("a.sql", "COPY t FROM/* x */stdin;\nit's\n\\.\n-- see ADR-9\n"), [("C3", 4)])
 
+    def test_from_stdin_inside_parentheses_starts_no_rows(self):
+        self.assertEqual(found("a.sql", "COPY (SELECT * FROM stdin) TO stdout;\nSELECT 1; -- see ADR-9\n"), [("C3", 2)])
+        text = "COPY t (a, b) FROM stdin (FORMAT csv);\nit's\n\\.\n-- see ADR-9\n"
+        self.assertEqual(found("a.sql", text), [("C3", 4)])
+
+    def test_a_psql_copy_command_from_stdin_starts_rows(self):
+        self.assertEqual(found("a.sql", "\\copy t (a) from stdin with csv\n1,it's\n\\.\n-- see ADR-9\n"), [("C3", 4)])
+        self.assertEqual(found("a.sql", "\\copy t from '/x/from stdin.csv'\n-- see ADR-9\n"), [("C3", 2)])
+        self.assertEqual(found("a.sql", "\\copy t to stdout\n-- see ADR-9\n"), [("C3", 2)])
+
     def test_a_dollar_body_opened_after_copy_on_its_line_is_still_a_body(self):
         self.assertEqual(found("a.sql", "COPY t FROM stdin; SELECT $$\n-- see ADR-9\n$$;\n-- see ADR-8\n"),
                          [("C3", 2), ("C3", 4)])
@@ -374,6 +403,43 @@ class TestCopyData(unittest.TestCase):
     def test_markers_in_the_rows_do_not_switch_to_mysql(self):
         text = "COPY t FROM stdin;\n`a`\t/*!x\nDELIMITER $$\n\\.\nSELECT 1--1;\n"
         self.assertEqual(comments("a.sql", text), [[], [], [], [], ["--1;"]])
+
+
+class TestPsqlCommands(unittest.TestCase):
+    def test_a_psql_command_is_code_to_the_end_of_its_line(self):
+        text = "\\echo it's -- x /* y $$ `z` /*!w*/\nSELECT 1--1; -- see ADR-9\n"
+        self.assertEqual(comments("a.sql", text), [[], ["--1; -- see ADR-9"]])
+        self.assertEqual(found("a.sql", "\\echo /*!x*/\nSELECT 'C:\\';\n-- see ADR-9\n"), [("C3", 3)])
+
+    def test_a_dollar_sign_in_a_psql_command_opens_nothing(self):
+        text = ("\\echo $$\nCREATE FUNCTION f() RETURNS int AS $$ BEGIN RETURN 1; END $$ LANGUAGE plpgsql;\n"
+                "-- one\n-- two\n")
+        self.assertEqual(found("a.sql", text), [("C1", 3)])
+
+    def test_a_psql_command_after_code_ends_the_statement(self):
+        self.assertEqual(found("a.sql", "SELECT 1 AS x \\gset\nCOPY t FROM stdin;\n1\tO'Brien\n\\.\n-- see ADR-9\n"),
+                         [("C3", 5)])
+        self.assertEqual(found("a.sql", "SELECT 1\n\\g\nCOPY t FROM stdin;\nx'y\n\\.\n-- see ADR-9\n"), [("C3", 6)])
+        self.assertEqual(found("a.sql", "COPY t FROM stdin \\g\nit's\n\\.\n-- see ADR-9\n"), [("C3", 4)])
+
+    def test_a_backtick_on_a_psql_line_after_a_statement_does_not_switch(self):
+        text = ("SELECT count(*) AS n FROM t \\gset\n\\set ts `date +%s`\n"
+                "CREATE FUNCTION f(p text) RETURNS text AS $$\n  SELECT replace(p, '\\', '/');\n$$ LANGUAGE sql;\n"
+                "-- see ADR-9\n")
+        self.assertEqual(found("a.sql", text), [("C3", 6)])
+        text = ("SELECT 1 AS one \\gset\n\\set ts `date +%s`\nCREATE FUNCTION g(d jsonb) RETURNS text AS $$\n"
+                "  SELECT d #>> '{a}';\n$$ LANGUAGE sql;\n")
+        self.assertEqual(comments("a.sql", text), [[], [], [], [], []])
+
+    def test_a_backslash_is_plain_code_in_a_dollar_body_and_in_mysql(self):
+        self.assertEqual(found("a.sql", "SELECT $$ a \\ b -- see ADR-9\n$$;\n"), [("C3", 1)])
+        text = MYSQL + "SELECT 1 \\G -- see ADR-9\nSELECT 2;\n"
+        self.assertEqual(comments("a.sql", text), [[], ["-- see ADR-9"], []])
+
+    def test_postgres_psql_regression_script_shapes_read_as_standard_sql(self):
+        text = (":try_to_quit\n\\echo `nosuchcommand` :foo\nselect '\\' as d1, '' as d2;\n-- see ADR-9\n"
+                "SELECT 1--1;\n")
+        self.assertEqual(comments("a.sql", text), [[], [], [], ["-- see ADR-9"], ["--1;"]])
 
 
 class TestLineEndings(unittest.TestCase):

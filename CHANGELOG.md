@@ -2,12 +2,15 @@
 
 ## 1.7.0
 
-- SQL is read (`.sql`), in two modes. A file that shows a MySQL marker (a `/*!` comment, a backtick name, a
-  statement opened by `#`, or a `DELIMITER` command) is read the MySQL way, and any other file as standard SQL, which
-  fits PostgreSQL, SQLite and T-SQL. Strings and quoted names are content. A Postgres dollar-quoted body is lexed as
-  SQL, so the comments in a plpgsql function are judged, and a body that does not lex is content. psql
-  `COPY ... FROM stdin` rows are content, and `/*!` executable comments and `/*+` hints are code. A string, quoted
-  name, block comment or dollar quote that never closes is exit code 2.
+- SQL is read (`.sql`), in two modes. A file that shows a MySQL marker (a `/*!` or MariaDB `/*M!` comment, a
+  backtick name, a statement opened by `#` and a non-space, or a `DELIMITER` command) is read the MySQL way, and any
+  other file as standard SQL, which fits PostgreSQL, SQLite and T-SQL. Strings and quoted names are content. A
+  Postgres dollar-quoted body is lexed as SQL, so the comments in a plpgsql function are judged, and a body that does
+  not lex is content. psql commands such as `\set` and `\gset` are code to the end of their line, the rows after
+  `COPY ... FROM stdin` and `\copy ... from stdin` are content, and `/*!` and `/*M!` executable comments and `/*+`
+  hints are code. A string, quoted name, block comment or dollar quote that never closes is exit code 2.
+- Generated dumps (pg_dump, mysqldump) open with multi-line header comments, which are C1. A repository that commits
+  them may exclude them in its settings.
 - Both `.pre-commit-hooks.yaml` ids match `.sql` files.
 - Findings move only for `.sql` files, which were skipped before. Nothing moves for any other file.
 - Codex CLI is supported: it has been seen blocking a write live, in Codex CLI 0.146.1 on macOS. Gemini CLI and
