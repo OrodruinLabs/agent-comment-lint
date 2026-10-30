@@ -7,7 +7,7 @@
   <a href="https://github.com/OrodruinLabs/agent-comment-lint/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
   <img src="https://img.shields.io/badge/python-3.9%E2%80%933.13-3776AB" alt="Python 3.9 to 3.13" />
   <img src="https://img.shields.io/badge/dependencies-none-brightgreen" alt="No dependencies" />
-  <img src="https://img.shields.io/badge/Claude_Code-Plugin-7c3aed" alt="Claude Code plugin" />
+  <a href="https://pypi.org/project/agent-comment-lint/"><img src="https://img.shields.io/pypi/v/agent-comment-lint" alt="PyPI" /></a>
 </p>
 
 ---
@@ -16,11 +16,11 @@ AI coding agents comment the way they chat: three lines restating what the next 
 ticket or plan they were working from. The restatement drifts from the code, and the pointer rots when the document
 moves.
 
-**Your CLAUDE.md asks; this enforces.**
+**Your CLAUDE.md or AGENTS.md asks; this enforces.**
 
-agent-comment-lint holds every comment to one line, with no ticket or plan references. In Claude Code it blocks the
-write before the comment lands and shows the agent why, so the agent can rewrite it. The same check runs in CI, in
-pre-commit and from the command line.
+agent-comment-lint holds every comment to one line, with no ticket or plan references. Inside Claude Code, and in
+preview inside Codex CLI, Gemini CLI and Windsurf, it blocks the write before the comment lands and shows the agent
+why, so the agent can rewrite it. The same check runs in CI, in pre-commit and from the command line.
 
 ```
 src/a.ts:12: C1: 3-line prose block (limit 1)
