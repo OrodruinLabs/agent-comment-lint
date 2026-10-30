@@ -148,3 +148,17 @@ class TestSqlShapesOtherDialectsReadDifferently(unittest.TestCase):
     def test_a_dash_pair_in_a_bracketed_name_reads_a_comment(self):
         # A T-SQL `[...]` name is read as code, so a `--` inside one opens a comment.
         self.assertEqual(comments("a.sql", "SELECT [a--b] FROM t;\n"), [["--b] FROM t;"]])
+
+    def test_a_dash_pair_in_a_dollar_quoted_string_reads_a_comment(self):
+        # A dollar-quoted body is lexed as SQL whenever it can be, also when it is a plain string literal.
+        self.assertEqual(found("a.sql", "SELECT $$ -- see ADR-9 $$;\n"), [("C3", 1)])
+
+    def test_a_quote_in_a_bracketed_name_opens_a_string(self):
+        # A T-SQL `[...]` name is read as code, so a `'` inside one opens a string that may never close.
+        with self.assertRaises(LexError):
+            engine.check_text("a.sql", "SELECT [it's] FROM t;\nGO\n")
+
+    def test_a_backslash_before_a_quote_escapes_it_in_a_sqlite_file_with_backtick_names(self):
+        # Backtick names make the file MySQL, where `\'` escapes a quote, but SQLite reads `'C:\'` as a whole string.
+        with self.assertRaises(LexError):
+            engine.check_text("a.sql", "CREATE TABLE `t`(p TEXT DEFAULT 'C:\\');\n-- see ADR-9\n")

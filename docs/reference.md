@@ -389,6 +389,9 @@ accident.
 | SQL | Outside MySQL mode a `#` followed by a space or the end of the line starts a comment, so a Postgres XOR written with spaces reads its right-hand side as comment text. | `SELECT a # b FROM t;` reads `# b FROM t;` as a comment |
 | SQL | Block comments do not nest. Postgres and T-SQL nest them, so in a nested comment the text after the first `*/` is read as code. | `/* a /* b */ c */` leaves ` c */` as code |
 | SQL | A T-SQL bracketed name `[...]` is read as code, so a `--` inside one starts a comment. | `SELECT [a--b] FROM t;` reads `--b] FROM t;` as a comment |
+| SQL | A dollar-quoted body is lexed as SQL whenever it can be, also when it is a plain string literal, so a `--` or `/*` inside one starts a comment. | `SELECT $$ -- see ADR-9 $$;` is C3 |
+| SQL | A `'` inside a T-SQL bracketed name `[...]` starts a string, which can swallow the comments after it or never close. One that never closes is exit code 2. | `SELECT [it's] FROM t;` is exit code 2 |
+| SQL | A backtick name makes the file MySQL, where a backslash escapes a quote. SQLite takes backtick names too but reads a backslash as a plain character, so a string that ends in one never closes, and that is exit code 2. | ``CREATE TABLE `t`(p TEXT DEFAULT 'C:\');`` is exit code 2 |
 | Python, with the `agent-context` pack on | `as requested` and `per the spec` match ordinary prose in a comment. Pinned by `tests/test_known_false_positives.py`. | `# calling CloseHandle as requested in [1]` and `# Map conditions (per the spec) to signals` are C3 |
 
 ## The write-time hook

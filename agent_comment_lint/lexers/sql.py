@@ -1,4 +1,5 @@
 """SQL: `--`, `#` and `/* */` comments, read the standard way unless the file shows a MySQL marker."""
+import bisect
 import re
 import string
 
@@ -10,8 +11,10 @@ MARKERS = Markers(hash=False, slash=False, block=False, star=False)
 # Code that starts nothing: a `#` before a non-space and a `$` that opens no quote join it; a `;` stands alone.
 STANDARD_RUN = re.compile(r"(?:[^\n\-#/'\"`$;]+|-(?!-)|#(?=\S)|/(?!\*)|\$(?!(?:[A-Za-z_][A-Za-z0-9_]*)?\$))*")
 # In MySQL a `--` opens a comment only before a space or the end of the line, and a `$` opens nothing.
-MYSQL_RUN = re.compile(r"(?:[^\n\-#/'\"`]+|-(?!-(?:\s|\Z))|/(?!\*))*")
+MYSQL_RUN = re.compile(r"(?:[^\n\-#/'\"`;]+|-(?!-(?:\s|\Z))|/(?!\*))*")
 DOLLAR_TAG = re.compile(r"\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$")
+# Every tag in the file, overlapping ones too: `$a$b$` holds both `$a$` and `$b$`.
+DOLLAR_TAGS = re.compile(r"(?=(%s))" % DOLLAR_TAG.pattern)
 IDENTIFIER_CHARS = frozenset(string.ascii_letters + string.digits + "_$")
 # A closing quote is never followed by another one, which would make the two a quote instead.
 QUOTED = {"'": re.compile(r"'[^']*(?:''[^']*)*'(?!')"), '"': re.compile(r'"[^"]*(?:""[^"]*)*"(?!")')}
@@ -19,8 +22,9 @@ ESCAPED = {"'": re.compile(r"'[^'\\]*(?:(?:\\.|'')[^'\\]*)*'(?!')", re.S),
            '"': re.compile(r'"[^"\\]*(?:(?:\\.|"")[^"\\]*)*"(?!")', re.S)}
 BACKTICK_NAME = re.compile(r"`[^`]*(?:``[^`]*)*`(?!`)")
 EXECUTABLE = ("/*!", "/*+")
-DELIMITER_COMMAND = re.compile(r"[^\S\n]*delimiter[^\S\n]+\S", re.I)
-COPY_FROM_STDIN = re.compile(r"copy\b.*\bfrom\s+stdin\b.*;\Z", re.I | re.S)
+# A statement that opens with a `#` comment, or with a `DELIMITER` command at the start of a line, is MySQL.
+MYSQL_STATEMENT = re.compile(r"[^\S\n]*#\S|(?<![^\n])[^\S\n]*delimiter[^\S\n]+\S", re.I)
+COPY_FROM_STDIN = re.compile(r"\s*copy\b.*\bfrom\s+stdin\b", re.I | re.S)
 ROWS_END = re.compile(r"^\\\.$", re.M)
 
 
@@ -38,7 +42,7 @@ class _Unclosed(Exception):
 
 
 def lex(text):
-    """Lex SQL; a `/*!` comment, a backtick name or a `DELIMITER` command anywhere in code makes it MySQL."""
+    """Lex SQL; a `/*!` comment or backtick name in code, or a statement opened by `#` or `DELIMITER`, means MySQL."""
     src = normalized(text)
     if not src:
         return []
@@ -77,11 +81,15 @@ def _lex(src, mysql):
     calls = []
     # Each dollar quote open around i: where its body's calls start, its tag, and the bounds outside it.
     frames = []
+    # Where each dollar-quote tag occurs, indexed when the first quote opens.
+    tags = None
     start, end, i = 0, len(src), 0
     closed_at = -1
-    # Where the code of the statement open at the top level starts, and whether a `COPY ... FROM stdin;` just ended.
-    statement, copying = None, False
-    marked = _delimiter_command(src, 0, calls) and _marker(mysql)
+    # The code of the statement open at the top level, and whether a `COPY ... FROM stdin;` just ended.
+    statement, copying = [], False
+    # Whether the line is a psql command such as `\connect db`, which takes no `;` and is part of no statement.
+    psql = False
+    marked = False
     while i < end or frames:
         if i == end:
             # The body lexed as SQL, so its calls stand and its closing tag ends it.
@@ -90,21 +98,28 @@ def _lex(src, mysql):
             i += len(tag)
             continue
         try:
+            top = not frames and not psql
+            if top and not statement and MYSQL_STATEMENT.match(src, i):
+                marked = _marker(mysql)
             run = (MYSQL_RUN if mysql else STANDARD_RUN).match(src, i, end).end()
             ch = src[i]
+            if top and run == i and ch != ";" and (statement or ch in "'\"`$"):
+                # A string, a quoted name or a dollar quote opens the statement; space and comments only part its words.
+                statement.append(" ")
             if run > i:
                 code = src[i:run]
                 calls.append((LineBuilder.emit, CODE, code))
-                # A psql command such as `\connect db` takes no `;`, so it starts no statement.
-                if statement is None and not frames and code.strip() and not code.lstrip().startswith("\\"):
-                    statement = run - len(code.lstrip())
+                if top:
+                    psql = not statement and code.lstrip().startswith("\\")
+                    if not psql and (statement or code.strip()):
+                        statement.append(code)
                 i = run
             elif ch == ";":
                 calls.append((LineBuilder.emit, CODE, ch))
                 i += 1
-                if not frames:
-                    copying = not mysql and statement is not None and bool(COPY_FROM_STDIN.match(src, statement, i))
-                    statement = None
+                if top:
+                    copying = not mysql and bool(COPY_FROM_STDIN.match("".join(statement)))
+                    statement = []
             elif ch == "\n" and copying and not frames:
                 # psql reads the lines after `COPY ... FROM stdin;` as table rows, up to a `\.` line or the end.
                 rows_end = ROWS_END.search(src, i + 1, end)
@@ -116,8 +131,7 @@ def _lex(src, mysql):
             elif ch == "\n":
                 calls.append((LineBuilder.newline, CODE))
                 i += 1
-                if not frames and _delimiter_command(src, i, calls):
-                    marked = _marker(mysql)
+                psql = False
             elif ch in "-#":
                 i = _line_comment(calls, src, i, end, closed_at)
             elif ch == "/":
@@ -134,7 +148,8 @@ def _lex(src, mysql):
                 i += 1
             elif ch == "$":
                 tag = DOLLAR_TAG.match(src, i, end).group()
-                close = src.find(tag, i + len(tag), end)
+                tags = tags or _dollar_tags(src)
+                close = _closing_tag(tags[tag], i + len(tag), end - len(tag))
                 if close < 0:
                     raise _Unclosed(i, "dollar quote")
                 calls.append((LineBuilder.emit, STRING, tag))
@@ -142,7 +157,8 @@ def _lex(src, mysql):
                 frames.append((len(calls), tag, start, end))
                 start, end = i, close
             else:
-                if ch == "`":
+                # psql runs the text between backticks on a command line as a shell command.
+                if ch == "`" and not psql:
                     marked = _marker(mysql)
                 i = _literal(calls, src, i, start, end, mysql)
         except _Unclosed as error:
@@ -151,24 +167,28 @@ def _lex(src, mysql):
             # The body does not lex as SQL, so all of it is content and the lines it spans open in a string.
             checkpoint, tag, outer_start, outer_end = frames.pop()
             del calls[checkpoint:]
-            calls.append((LineBuilder.emit_span, STRING, src[start:end] + tag))
+            calls.append((_string_span, src, start, end + len(tag)))
             start, end, i = outer_start, outer_end, end + len(tag)
     return calls, marked
 
 
-def _delimiter_command(src, i, calls):
-    """True when the line at i is the MySQL client's `DELIMITER` command at the start of a statement."""
-    return DELIMITER_COMMAND.match(src, i) is not None and _statement_start(calls)
+def _dollar_tags(src):
+    """The positions of each dollar-quote tag in src, in order, so that a closing tag is found without a scan."""
+    tags = {}
+    for found in DOLLAR_TAGS.finditer(src):
+        tags.setdefault(found.group(1), []).append(found.start())
+    return tags
 
 
-def _statement_start(calls):
-    """True when nothing but space and comments follows the last `;` or the start of the file."""
-    for call, *args in reversed(calls):
-        if call is LineBuilder.emit_span or call is LineBuilder.emit and args[0] == STRING:
-            return False
-        if call is LineBuilder.emit and args[0] == CODE and args[1].strip():
-            return args[1].rstrip().endswith(";")
-    return True
+def _closing_tag(positions, first, last):
+    """The first of a tag's positions from `first` to `last`, or -1."""
+    k = bisect.bisect_left(positions, first)
+    return positions[k] if k < len(positions) and positions[k] <= last else -1
+
+
+def _string_span(out, src, start, stop):
+    """Replay a dollar-quoted body that does not lex as string content, sliced only if no outer body took it back."""
+    out.emit_span(STRING, src[start:stop])
 
 
 def _line_comment(calls, src, i, end, closed_at):

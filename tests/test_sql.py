@@ -5,7 +5,7 @@ import time
 import unittest
 
 from agent_comment_lint.lexers import LexError, family_for
-from agent_comment_lint.lexers.base import CODE, COMMENT, STRING
+from agent_comment_lint.lexers.base import CODE, STRING
 from support import LONG, comments, found
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -75,6 +75,35 @@ class TestDialect(unittest.TestCase):
     def test_a_delimiter_after_a_comment_still_switches(self):
         text = "SELECT 1; -- one\n/* two */\nDELIMITER $$\nCREATE PROCEDURE a() BEGIN SELECT 1--1; END $$\n"
         self.assertEqual(comments("a.sql", text), [["-- one"], ["/* two */"], [], []])
+
+    def test_a_delimiter_after_code_or_a_comment_on_its_line_does_not_switch(self):
+        procedures = "CREATE PROCEDURE a() BEGIN SELECT 1; END $$\nCREATE PROCEDURE b() BEGIN SELECT 2; END $$\n"
+        for first in ("/* setup */ DELIMITER $$\n", "SET x = 1; DELIMITER $$\n"):
+            with self.assertRaises(LexError) as caught:
+                found("a.sql", first + procedures + "DELIMITER ;\n")
+            self.assertEqual((caught.exception.line, caught.exception.message), (3, "unterminated dollar quote"))
+
+    def test_a_hash_that_starts_a_statement_switches_to_mysql(self):
+        text = ("#Create the users' table\nCREATE TABLE `users` (`id` INT); -- see ADR-9\n#Don't forget the index\n"
+                "CREATE INDEX i ON users (id);\n")
+        self.assertEqual(found("a.sql", text), [("C3", 2)])
+        self.assertEqual(comments("a.sql", text), [["#Create the users' table"], ["-- see ADR-9"],
+                                                   ["#Don't forget the index"], []])
+        self.assertEqual(comments("a.sql", "SELECT 'it\\'s';\n#note\n"), [[], ["#note"]])
+
+    def test_a_hash_inside_a_statement_or_before_a_space_does_not_switch(self):
+        self.assertEqual(found("a.sql", "SELECT a\nINTO #t\nFROM x;\n-- see ADR-9\n"), [("C3", 4)])
+        self.assertEqual(comments("a.sql", "SELECT a\nINTO #t\nFROM x;\nSELECT 1--1;\n"), [[], [], [], ["--1;"]])
+        self.assertEqual(comments("a.sql", "CREATE TABLE #t (a int);\nSELECT 1--1;\n"), [[], ["--1;"]])
+        self.assertEqual(comments("a.sql", "# note\nSELECT 1--1;\n"), [["# note"], ["--1;"]])
+
+    def test_a_backtick_on_a_psql_command_line_does_not_switch(self):
+        text = ("\\set today `date +%F`\nCREATE FUNCTION f(p text) RETURNS text AS $$\n"
+                "  SELECT replace(p, '\\', '/');\n$$ LANGUAGE sql;\n-- see ADR-9\n")
+        self.assertEqual(found("a.sql", text), [("C3", 5)])
+        text = ("\\set today `date +%F`\nCREATE FUNCTION f(d jsonb) RETURNS text AS $$\n"
+                "  SELECT d #>> '{a}';\n$$ LANGUAGE sql;\n")
+        self.assertEqual(comments("a.sql", text), [[], [], [], []])
 
 
 class TestDashComments(unittest.TestCase):
@@ -324,6 +353,14 @@ class TestCopyData(unittest.TestCase):
         self.assertEqual(found("a.sql", "SELECT 1 FROM stdin;\n-- see ADR-9\n"), [("C3", 2)])
         self.assertEqual(found("a.sql", "-- COPY t FROM stdin;\nSELECT 1; -- see ADR-9\n"), [("C3", 2)])
 
+    def test_only_the_code_of_the_copy_statement_counts(self):
+        text = ("COPY users (id, email)\n-- switch to FROM stdin when loading locally\n"
+                "FROM '/data/users.csv' WITH (FORMAT csv);\n\n-- see ADR-9\nCREATE TABLE t (a int);\n")
+        self.assertEqual(found("a.sql", text), [("C3", 5)])
+        self.assertEqual(found("a.sql", "COPY t FROM '/data/from stdin.csv';\n-- see ADR-9\n"), [("C3", 2)])
+        self.assertEqual(found("a.sql", "COPY t TO stdout /* not from stdin */;\n-- see ADR-9\n"), [("C3", 2)])
+        self.assertEqual(found("a.sql", "COPY t FROM/* x */stdin;\nit's\n\\.\n-- see ADR-9\n"), [("C3", 4)])
+
     def test_a_dollar_body_opened_after_copy_on_its_line_is_still_a_body(self):
         self.assertEqual(found("a.sql", "COPY t FROM stdin; SELECT $$\n-- see ADR-9\n$$;\n-- see ADR-8\n"),
                          [("C3", 2), ("C3", 4)])
@@ -361,6 +398,15 @@ class TestLongInput(unittest.TestCase):
         started = time.perf_counter()
         self.assertEqual(found("a.sql", "SELECT $$it's$$;\n" * 20000 + "-- see ADR-9\n"), [("C3", 20001)])
         self.assertLess(time.perf_counter() - started, 5.0)
+
+    def test_deeply_nested_dollar_quotes_are_quick(self):
+        depth = 32000
+        openers = "".join("$t%d$ " % k for k in range(depth))
+        started = time.perf_counter()
+        for closer in ("$t%d$ ", "y's $t%d$ "):
+            closers = "".join(closer % k for k in reversed(range(depth)))
+            self.assertEqual(found("a.sql", "SELECT " + openers + "x " + closers + ";\n-- see ADR-9\n"), [("C3", 2)])
+        self.assertLess(time.perf_counter() - started, 10.0)
 
     def test_many_copy_blocks_are_quick(self):
         block = "COPY public.t (a, b) FROM stdin;\n" + "1\tit's -- see ADR-7; /* y\n" * 10 + "\\.\n"
