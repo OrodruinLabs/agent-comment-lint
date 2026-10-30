@@ -212,6 +212,12 @@ class TestQuotedIdentifiers(unittest.TestCase):
     def test_a_backtick_identifier_is_content(self):
         self.assertEqual(comments("a.sql", "SELECT `a--b`, `c``#d` FROM t; -- see ADR-9\n"), [["-- see ADR-9"]])
 
+    def test_a_double_quoted_string_takes_backslash_escapes_in_mysql(self):
+        self.assertEqual(comments("a.sql", MYSQL + 'SELECT "it\\"s -- x" -- see ADR-9\n'), [[], ["-- see ADR-9"]])
+        with self.assertRaises(LexError) as caught:
+            found("a.sql", MYSQL + 'SELECT "it\\"\n;\n')
+        self.assertEqual((caught.exception.line, caught.exception.message), (2, "unterminated string"))
+
     def test_a_bracketed_identifier_is_code(self):
         self.assertEqual(comments("a.sql", "SELECT [a b] FROM t; -- see ADR-9\n"), [["-- see ADR-9"]])
 
@@ -268,6 +274,71 @@ class TestDollarQuoting(unittest.TestCase):
         self.assertEqual((caught.exception.line, caught.exception.message), (2, "unterminated dollar quote"))
 
 
+class TestCopyData(unittest.TestCase):
+    BLOCK = "COPY public.t (a, b) FROM stdin;\n1\tit's\n2\t-- x\n3\t/* y\n"
+
+    def test_the_rows_after_copy_from_stdin_are_content(self):
+        self.assertEqual(found("a.sql", self.BLOCK + "\\.\n-- see ADR-9\n"), [("C3", 6)])
+
+    def test_the_rows_open_in_a_string_and_the_end_line_is_code(self):
+        self.assertEqual(opens(self.BLOCK + "\\.\nSELECT 1;\n"), [CODE, STRING, STRING, STRING, CODE, CODE])
+
+    def test_rows_that_run_to_the_end_of_the_file_are_content(self):
+        self.assertEqual(found("a.sql", self.BLOCK), [])
+        self.assertEqual(found("a.sql", "COPY t FROM stdin;"), [])
+
+    def test_an_empty_block_ends_at_its_end_line(self):
+        self.assertEqual(found("a.sql", "COPY t FROM stdin;\n\\.\n-- see ADR-9\n"), [("C3", 3)])
+
+    def test_only_a_line_that_is_exactly_the_end_marker_ends_the_rows(self):
+        text = "COPY t FROM stdin;\n \\.\n\\. x\n-- see ADR-8\n\\.\n-- see ADR-9\n"
+        self.assertEqual(found("a.sql", text), [("C3", 6)])
+
+    def test_any_case_and_any_space_start_the_rows(self):
+        self.assertEqual(found("a.sql", "copy t (a)\n  from   STDIN ;\nit's\n\\.\n-- see ADR-9\n"), [("C3", 5)])
+
+    def test_options_after_stdin_still_start_the_rows(self):
+        text = "COPY t FROM stdin WITH (FORMAT csv);\n1,it's,-- x\n\\.\n-- see ADR-9\n"
+        self.assertEqual(found("a.sql", text), [("C3", 4)])
+        text = "COPY t (a) FROM STDIN CSV HEADER;\na\nit's -- x\n\\.\n-- see ADR-9\n"
+        self.assertEqual(found("a.sql", text), [("C3", 5)])
+
+    def test_a_semicolon_in_an_option_string_does_not_end_the_copy(self):
+        text = "COPY t FROM stdin WITH (FORMAT csv, DELIMITER ';');\n1;it's;-- x\n\\.\n-- see ADR-9\n"
+        self.assertEqual(found("a.sql", text), [("C3", 4)])
+
+    def test_a_comment_on_the_copy_line_is_read(self):
+        self.assertEqual(found("a.sql", "COPY t FROM stdin; -- see ADR-9\nit's\n\\.\n"), [("C3", 1)])
+
+    def test_a_second_block_after_rows_holding_a_semicolon_is_content(self):
+        text = "COPY a FROM stdin;\nx;y\n\\.\nCOPY b FROM stdin;\nit's\n\\.\n-- see ADR-9\n"
+        self.assertEqual(found("a.sql", text), [("C3", 7)])
+
+    def test_a_psql_command_line_before_copy_starts_no_statement(self):
+        text = "\\set ON_ERROR_STOP on\n\\connect db\nCOPY t FROM stdin;\nit's\n\\.\n-- see ADR-9\n"
+        self.assertEqual(found("a.sql", text), [("C3", 6)])
+
+    def test_other_copy_statements_start_no_rows(self):
+        self.assertEqual(found("a.sql", "COPY t FROM '/x.csv';\n-- see ADR-9\n"), [("C3", 2)])
+        self.assertEqual(found("a.sql", "COPY t TO stdout;\n-- see ADR-9\n"), [("C3", 2)])
+        self.assertEqual(found("a.sql", "SELECT 1 FROM stdin;\n-- see ADR-9\n"), [("C3", 2)])
+        self.assertEqual(found("a.sql", "-- COPY t FROM stdin;\nSELECT 1; -- see ADR-9\n"), [("C3", 2)])
+
+    def test_a_dollar_body_opened_after_copy_on_its_line_is_still_a_body(self):
+        self.assertEqual(found("a.sql", "COPY t FROM stdin; SELECT $$\n-- see ADR-9\n$$;\n-- see ADR-8\n"),
+                         [("C3", 2), ("C3", 4)])
+        self.assertEqual(found("a.sql", "COPY t FROM stdin; SELECT $$\n-- see ADR-9\n$$;\n\\.\n-- see ADR-8\n"),
+                         [("C3", 2), ("C3", 5)])
+
+    def test_copy_starts_no_rows_in_mysql_or_inside_a_dollar_body(self):
+        self.assertEqual(found("a.sql", MYSQL + "COPY t FROM stdin;\n-- see ADR-9\n"), [("C3", 3)])
+        self.assertEqual(found("a.sql", "SELECT $$ COPY t FROM stdin;\n-- see ADR-9\n$$;\n"), [("C3", 2)])
+
+    def test_markers_in_the_rows_do_not_switch_to_mysql(self):
+        text = "COPY t FROM stdin;\n`a`\t/*!x\nDELIMITER $$\n\\.\nSELECT 1--1;\n"
+        self.assertEqual(comments("a.sql", text), [[], [], [], [], ["--1;"]])
+
+
 class TestLineEndings(unittest.TestCase):
     def test_windows_line_endings_lex_like_newlines(self):
         self.assertEqual(found("a.sql", "-- a\r\n-- b\r\nSELECT 1;\r\n"), found("a.sql", "-- a\n-- b\nSELECT 1;\n"))
@@ -289,6 +360,12 @@ class TestLongInput(unittest.TestCase):
     def test_many_bodies_that_do_not_lex_are_quick(self):
         started = time.perf_counter()
         self.assertEqual(found("a.sql", "SELECT $$it's$$;\n" * 20000 + "-- see ADR-9\n"), [("C3", 20001)])
+        self.assertLess(time.perf_counter() - started, 5.0)
+
+    def test_many_copy_blocks_are_quick(self):
+        block = "COPY public.t (a, b) FROM stdin;\n" + "1\tit's -- see ADR-7; /* y\n" * 10 + "\\.\n"
+        started = time.perf_counter()
+        self.assertEqual(found("a.sql", block * 2000 + "-- see ADR-9\n"), [("C3", 24001)])
         self.assertLess(time.perf_counter() - started, 5.0)
 
     def test_a_long_unterminated_string_is_refused_quickly(self):

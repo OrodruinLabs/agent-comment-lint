@@ -7,8 +7,8 @@ from .base import CODE, COMMENT, STRING, BlockLine, Family, LexError, LineBuilde
 # The lexer places every comment line itself, so the rules never read a raw line for a marker of their own.
 MARKERS = Markers(hash=False, slash=False, block=False, star=False)
 
-# Code that can start nothing: a `#` before a non-space, and a `$` that opens no dollar quote, are code here.
-STANDARD_RUN = re.compile(r"(?:[^\n\-#/'\"`$]+|-(?!-)|#(?=\S)|/(?!\*)|\$(?!(?:[A-Za-z_][A-Za-z0-9_]*)?\$))*")
+# Code that starts nothing: a `#` before a non-space and a `$` that opens no quote join it; a `;` stands alone.
+STANDARD_RUN = re.compile(r"(?:[^\n\-#/'\"`$;]+|-(?!-)|#(?=\S)|/(?!\*)|\$(?!(?:[A-Za-z_][A-Za-z0-9_]*)?\$))*")
 # In MySQL a `--` opens a comment only before a space or the end of the line, and a `$` opens nothing.
 MYSQL_RUN = re.compile(r"(?:[^\n\-#/'\"`]+|-(?!-(?:\s|\Z))|/(?!\*))*")
 DOLLAR_TAG = re.compile(r"\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$")
@@ -20,6 +20,8 @@ ESCAPED = {"'": re.compile(r"'[^'\\]*(?:(?:\\.|'')[^'\\]*)*'(?!')", re.S),
 BACKTICK_NAME = re.compile(r"`[^`]*(?:``[^`]*)*`(?!`)")
 EXECUTABLE = ("/*!", "/*+")
 DELIMITER_COMMAND = re.compile(r"[^\S\n]*delimiter[^\S\n]+\S", re.I)
+COPY_FROM_STDIN = re.compile(r"copy\b.*\bfrom\s+stdin\b.*;\Z", re.I | re.S)
+ROWS_END = re.compile(r"^\\\.$", re.M)
 
 
 class _MySQL(Exception):
@@ -77,6 +79,8 @@ def _lex(src, mysql):
     frames = []
     start, end, i = 0, len(src), 0
     closed_at = -1
+    # Where the code of the statement open at the top level starts, and whether a `COPY ... FROM stdin;` just ended.
+    statement, copying = None, False
     marked = _delimiter_command(src, 0, calls) and _marker(mysql)
     while i < end or frames:
         if i == end:
@@ -89,8 +93,26 @@ def _lex(src, mysql):
             run = (MYSQL_RUN if mysql else STANDARD_RUN).match(src, i, end).end()
             ch = src[i]
             if run > i:
-                calls.append((LineBuilder.emit, CODE, src[i:run]))
+                code = src[i:run]
+                calls.append((LineBuilder.emit, CODE, code))
+                # A psql command such as `\connect db` takes no `;`, so it starts no statement.
+                if statement is None and not frames and code.strip() and not code.lstrip().startswith("\\"):
+                    statement = run - len(code.lstrip())
                 i = run
+            elif ch == ";":
+                calls.append((LineBuilder.emit, CODE, ch))
+                i += 1
+                if not frames:
+                    copying = not mysql and statement is not None and bool(COPY_FROM_STDIN.match(src, statement, i))
+                    statement = None
+            elif ch == "\n" and copying and not frames:
+                # psql reads the lines after `COPY ... FROM stdin;` as table rows, up to a `\.` line or the end.
+                rows_end = ROWS_END.search(src, i + 1, end)
+                calls.append((LineBuilder.emit_span, STRING, src[i:rows_end.start() - 1 if rows_end else end]))
+                if rows_end:
+                    # The `\.` line is code, and part of no statement.
+                    calls.extend(((LineBuilder.newline, CODE), (LineBuilder.emit, CODE, rows_end.group())))
+                i, copying = rows_end.end() if rows_end else end, False
             elif ch == "\n":
                 calls.append((LineBuilder.newline, CODE))
                 i += 1
