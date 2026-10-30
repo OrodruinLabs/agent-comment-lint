@@ -134,3 +134,17 @@ class TestJavaUnicodeEscapes(unittest.TestCase):
         # javac translates the escape before lexing, so the code after it is code; here it reads as comment text.
         text = "int a; // end \\u000a see ADR-9\n"
         self.assertEqual(found("A.java", text), [("C3", 1)])
+
+
+class TestSqlShapesOtherDialectsReadDifferently(unittest.TestCase):
+    def test_a_postgres_xor_written_with_spaces_reads_a_comment(self):
+        # Outside MySQL mode a `#` before a space opens a comment, so the right-hand side of the XOR is comment text.
+        self.assertEqual(comments("a.sql", "SELECT a # b FROM t;\n"), [["# b FROM t;"]])
+
+    def test_a_nested_block_comment_ends_at_its_first_close(self):
+        # Postgres and T-SQL nest block comments, but here the first `*/` ends one, so the rest reads as code.
+        self.assertEqual(comments("a.sql", "/* a /* b */ c */\n"), [["/* a /* b */"]])
+
+    def test_a_dash_pair_in_a_bracketed_name_reads_a_comment(self):
+        # A T-SQL `[...]` name is read as code, so a `--` inside one opens a comment.
+        self.assertEqual(comments("a.sql", "SELECT [a--b] FROM t;\n"), [["--b] FROM t;"]])

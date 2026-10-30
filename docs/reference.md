@@ -386,6 +386,9 @@ accident.
 | Go | The cgo preamble, the comment right before `import "C"`, holds C code, and its lines count as comment prose. | `// #include <stdlib.h>` / `// static int twice(int x) { return 2 * x; }` / `import "C"` is C1 |
 | Go | A `//lint:ignore Check reason` directive has no second `//`, so its reason is never judged. | `//lint:ignore SA1019 see ADR-9` is clean |
 | Java | A `\u000a` escape inside a `//` comment ends the comment in javac, which translates escapes first. Here the comment runs on, so the code after the escape is read as comment text. | `// end \u000a see ADR-9` is C3 even though `see ADR-9` is code |
+| SQL | Outside MySQL mode a `#` followed by a space or the end of the line starts a comment, so a Postgres XOR written with spaces reads its right-hand side as comment text. | `SELECT a # b FROM t;` reads `# b FROM t;` as a comment |
+| SQL | Block comments do not nest. Postgres and T-SQL nest them, so in a nested comment the text after the first `*/` is read as code. | `/* a /* b */ c */` leaves ` c */` as code |
+| SQL | A T-SQL bracketed name `[...]` is read as code, so a `--` inside one starts a comment. | `SELECT [a--b] FROM t;` reads `--b] FROM t;` as a comment |
 | Python, with the `agent-context` pack on | `as requested` and `per the spec` match ordinary prose in a comment. Pinned by `tests/test_known_false_positives.py`. | `# calling CloseHandle as requested in [1]` and `# Map conditions (per the spec) to signals` are C3 |
 
 ## The write-time hook
